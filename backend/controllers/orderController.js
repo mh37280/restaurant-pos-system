@@ -1,19 +1,22 @@
-const db = require('../models/database');
+const db = require("../models/database");
 
 exports.getAllOrders = (req, res) => {
-  db.all(`
+  db.all(
+    `
     SELECT orders.*, drivers.name AS driver_name
     FROM orders
     LEFT JOIN drivers ON orders.driver_id = drivers.id
     ORDER BY orders.id DESC
-  `, [], (err, rows) => {
-    if (err) {
-      return res.status(500).json({ error: err.message });
+  `,
+    [],
+    (err, rows) => {
+      if (err) {
+        return res.status(500).json({ error: err.message });
+      }
+      res.json(rows);
     }
-    res.json(rows);
-  });
+  );
 };
-
 
 exports.createOrder = (req, res) => {
   const {
@@ -24,7 +27,7 @@ exports.createOrder = (req, res) => {
     phone_number,
     address,
     payment_method,
-    driver_id
+    driver_id,
   } = req.body;
 
   db.run(
@@ -38,7 +41,7 @@ exports.createOrder = (req, res) => {
       phone_number,
       address,
       payment_method,
-      driver_id || null
+      driver_id || null,
     ],
     function (err) {
       if (err) {
@@ -47,4 +50,17 @@ exports.createOrder = (req, res) => {
       res.json({ id: this.lastID });
     }
   );
+};
+
+exports.deleteOrder = (req, res) => {
+  const id = parseInt(req.params.id);
+  if (!id) return res.status(400).json({ error: "Invalid ID" });
+
+  db.run(`DELETE FROM orders WHERE id = ?`, [id], function (err) {
+    if (err) return res.status(500).json({ error: err.message });
+    if (this.changes === 0) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+    res.json({ success: true });
+  });
 };

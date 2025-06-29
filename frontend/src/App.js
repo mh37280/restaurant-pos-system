@@ -1,54 +1,55 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 
 function App() {
   const [menu, setMenu] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [orderType, setOrderType] = useState('pickup');
-  const [customerName, setCustomerName] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [address, setAddress] = useState('');
+  const [orderType, setOrderType] = useState("pickup");
+  const [customerName, setCustomerName] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [address, setAddress] = useState("");
   const [selectedItems, setSelectedItems] = useState([]);
-  const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [paymentMethod, setPaymentMethod] = useState("cash");
   const [orders, setOrders] = useState([]);
   const [drivers, setDrivers] = useState([]);
-  const [driverName, setDriverName] = useState('');
-  const [driverPhone, setDriverPhone] = useState('');
-  const [selectedDriverId, setSelectedDriverId] = useState('');
+  const [driverName, setDriverName] = useState("");
+  const [driverPhone, setDriverPhone] = useState("");
+  const [selectedDriverId, setSelectedDriverId] = useState("");
 
-  
+  const navigate = useNavigate();
+
   useEffect(() => {
-    fetch('/api/menu')
-      .then(res => res.json())
-      .then(data => {
+    fetch("/api/menu")
+      .then((res) => res.json())
+      .then((data) => {
         setMenu(data);
         setLoading(false);
       });
 
-    fetch('/api/orders')
-  .then(res => res.json())
-  .then(data => {
-    if (Array.isArray(data)) {
-      setOrders(data);
-    } else {
-      console.error("Unexpected response format:", data);
-      setOrders([]);
-    }
-  })
-  .catch(err => {
-    console.error("Failed to fetch orders:", err);
-    setOrders([]);
-  });
+    fetch("/api/orders")
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setOrders(data);
+        } else {
+          console.error("Unexpected response format:", data);
+          setOrders([]);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to fetch orders:", err);
+        setOrders([]);
+      });
 
-
-    fetch('/api/drivers')
-      .then(res => res.json())
-      .then(data => setDrivers(data));
+    fetch("/api/drivers")
+      .then((res) => res.json())
+      .then((data) => setDrivers(data));
   }, []);
 
   const toggleItem = (item) => {
-    const exists = selectedItems.find(i => i.id === item.id);
+    const exists = selectedItems.find((i) => i.id === item.id);
     if (exists) {
-      setSelectedItems(selectedItems.filter(i => i.id !== item.id));
+      setSelectedItems(selectedItems.filter((i) => i.id !== item.id));
     } else {
       setSelectedItems([...selectedItems, item]);
     }
@@ -67,67 +68,82 @@ function App() {
       phone_number: phoneNumber,
       address,
       payment_method: paymentMethod,
-      driver_id: orderType === 'delivery' ? parseInt(selectedDriverId) : null,
+      driver_id: orderType === "delivery" ? parseInt(selectedDriverId) : null,
     };
 
-    const res = await fetch('/api/orders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const res = await fetch("/api/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(order),
     });
 
     if (res.ok) {
-      alert('Order placed!');
+      alert("Order placed!");
       setSelectedItems([]);
-      setCustomerName('');
-      setPhoneNumber('');
-      setAddress('');
-      setSelectedDriverId('');
+      setCustomerName("");
+      setPhoneNumber("");
+      setAddress("");
+      setSelectedDriverId("");
 
-      const updated = await fetch('/api/orders').then(res => res.json());
+      const updated = await fetch("/api/orders").then((res) => res.json());
       setOrders(updated);
     } else {
-      alert('Failed to place order');
+      alert("Failed to place order");
     }
   };
 
   const addDriver = async () => {
-    if (!driverName) return alert('Enter driver name');
-    const res = await fetch('/api/drivers', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    if (!driverName) return alert("Enter driver name");
+    const res = await fetch("/api/drivers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: driverName, phone: driverPhone }),
     });
 
     if (res.ok) {
-      alert('Driver added!');
-      setDriverName('');
-      setDriverPhone('');
-      const updated = await fetch('/api/drivers').then(res => res.json());
+      alert("Driver added!");
+      setDriverName("");
+      setDriverPhone("");
+      const updated = await fetch("/api/drivers").then((res) => res.json());
       setDrivers(updated);
     } else {
-      alert('Failed to add driver');
+      alert("Failed to add driver");
     }
   };
 
   const getDriverNameById = (id) => {
-    const driver = drivers.find(d => d.id === id);
-    return driver ? driver.name : 'Unassigned';
+    const driver = drivers.find((d) => d.id === id);
+    return driver ? driver.name : "Unassigned";
   };
 
+  const voidOrder = async (id) => {
+    if (!window.confirm(`Are you sure you want to void order #${id}?`)) return;
+
+    const res = await fetch(`/api/orders/${id}`, {
+      method: "DELETE",
+    });
+
+    if (res.ok) {
+      alert("Order voided.");
+      const updated = await fetch("/api/orders").then((res) => res.json());
+      setOrders(updated);
+    } else {
+      alert("Failed to void order.");
+    }
+  };
   return (
-    <div style={{ padding: '20px', fontFamily: 'Arial' }}>
+    <div style={{ padding: "20px", fontFamily: "Arial" }}>
       <h1>Menu</h1>
       {loading ? (
         <p>Loading menu...</p>
       ) : (
         <ul>
-          {menu.map(item => (
+          {menu.map((item) => (
             <li key={item.id}>
               <label>
                 <input
                   type="checkbox"
-                  checked={selectedItems.some(i => i.id === item.id)}
+                  checked={selectedItems.some((i) => i.id === item.id)}
                   onChange={() => toggleItem(item)}
                 />
                 {item.name} – ${item.price.toFixed(2)} ({item.category})
@@ -142,30 +158,49 @@ function App() {
       <h2>Order Info</h2>
       <label>
         Order Type:
-        <select value={orderType} onChange={e => setOrderType(e.target.value)}>
+        <select
+          value={orderType}
+          onChange={(e) => setOrderType(e.target.value)}
+        >
           <option value="pickup">Pick Up</option>
           <option value="to_go">To Go</option>
           <option value="delivery">Delivery</option>
         </select>
       </label>
-      <br /><br />
+      <br />
+      <br />
 
       <label>
-        Name: <input value={customerName} onChange={e => setCustomerName(e.target.value)} />
+        Name:{" "}
+        <input
+          value={customerName}
+          onChange={(e) => setCustomerName(e.target.value)}
+        />
       </label>
-      <br /><br />
+      <br />
+      <br />
 
       <label>
-        Phone Number: <input value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)} />
+        Phone Number:{" "}
+        <input
+          value={phoneNumber}
+          onChange={(e) => setPhoneNumber(e.target.value)}
+        />
       </label>
-      <br /><br />
+      <br />
+      <br />
 
-      {orderType === 'delivery' && (
+      {orderType === "delivery" && (
         <>
           <label>
-            Address: <input value={address} onChange={e => setAddress(e.target.value)} />
+            Address:{" "}
+            <input
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+            />
           </label>
-          <br /><br />
+          <br />
+          <br />
 
           <label>
             Assign Driver:
@@ -174,29 +209,35 @@ function App() {
               onChange={(e) => setSelectedDriverId(e.target.value)}
             >
               <option value="">-- Select Driver --</option>
-              {drivers.map(driver => (
+              {drivers.map((driver) => (
                 <option key={driver.id} value={driver.id}>
                   {driver.name}
                 </option>
               ))}
             </select>
           </label>
-          <br /><br />
+          <br />
+          <br />
         </>
       )}
 
       <label>
         Payment Method:
-        <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)}>
+        <select
+          value={paymentMethod}
+          onChange={(e) => setPaymentMethod(e.target.value)}
+        >
           <option value="cash">Cash</option>
           <option value="credit">Credit</option>
           <option value="check">Check</option>
         </select>
       </label>
 
-      <br /><br />
+      <br />
+      <br />
       <strong>Total: ${calculateTotal()}</strong>
-      <br /><br />
+      <br />
+      <br />
 
       <button onClick={placeOrder} disabled={selectedItems.length === 0}>
         Place Order
@@ -208,36 +249,63 @@ function App() {
         <p>No orders yet.</p>
       ) : (
         <ul>
-          {orders.map(order => (
-            <li key={order.id} style={{ marginBottom: '10px' }}>
-              <strong>Order #{order.id}</strong><br />
-              <em>Type:</em> {order.order_type}, <em>Payment:</em> {order.payment_method}<br />
-              <em>Customer:</em> {order.customer_name} ({order.phone_number})<br />
-              <em>Address:</em> {order.address || 'N/A'}<br />
-              <em>Driver:</em> {order.driver_name || 'Unassigned'}
+          {orders.map((order) => (
+            <li key={order.id} style={{ marginBottom: "10px" }}>
+              <strong>Order #{order.id}</strong>
+              <br />
+              <em>Type:</em> {order.order_type}, <em>Payment:</em>{" "}
+              {order.payment_method}
+              <br />
+              <em>Customer:</em> {order.customer_name} ({order.phone_number})
+              <br />
+              <em>Address:</em> {order.address || "N/A"}
+              <br />
+              <em>Driver:</em> {order.driver_name || "Unassigned"}
+              <br />
               <em>Items:</em>
               <ul>
                 {JSON.parse(order.items).map((item, i) => (
-                  <li key={i}>{item.name} – ${item.price.toFixed(2)}</li>
+                  <li key={i}>
+                    {item.name} – ${item.price.toFixed(2)}
+                  </li>
                 ))}
               </ul>
-              <em>Total:</em> ${order.total.toFixed(2)}<br />
-              <em>Time:</em> {new Date(order.created_at).toLocaleString()}
+              <em>Total:</em> ${order.total.toFixed(2)}
+              <br />
+              <em>Time:</em> {new Date(order.created_at).toLocaleString()}{" "}
+              <br />
+              <button
+                onClick={() => voidOrder(order.id)}
+                style={{ marginTop: "5px", color: "red" }}
+              >
+                ❌ Void
+              </button>
             </li>
           ))}
         </ul>
       )}
+      <button onClick={() => navigate("/settle")}>Daily Settle</button>
 
       <hr />
       <h2>🚚 Driver Management</h2>
       <label>
-        Name: <input value={driverName} onChange={e => setDriverName(e.target.value)} />
+        Name:{" "}
+        <input
+          value={driverName}
+          onChange={(e) => setDriverName(e.target.value)}
+        />
       </label>
-      <br /><br />
+      <br />
+      <br />
       <label>
-        Phone: <input value={driverPhone} onChange={e => setDriverPhone(e.target.value)} />
+        Phone:{" "}
+        <input
+          value={driverPhone}
+          onChange={(e) => setDriverPhone(e.target.value)}
+        />
       </label>
-      <br /><br />
+      <br />
+      <br />
       <button onClick={addDriver}>Add Driver</button>
 
       <h3>Available Drivers</h3>
@@ -245,7 +313,7 @@ function App() {
         {drivers.length === 0 ? (
           <li>No drivers added yet.</li>
         ) : (
-          drivers.map(driver => (
+          drivers.map((driver) => (
             <li key={driver.id}>
               {driver.name} ({driver.phone})
             </li>
