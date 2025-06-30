@@ -64,3 +64,25 @@ exports.deleteOrder = (req, res) => {
     res.json({ success: true });
   });
 };
+
+exports.updateOrderDriver = (req, res) => {
+  const { order_id, driver_id } = req.body;
+
+  if (!order_id || driver_id === undefined) {
+    return res.status(400).json({ error: "Missing order_id or driver_id" });
+  }
+
+  const query = `UPDATE orders SET driver_id = ? WHERE id = ?`;
+  db.run(query, [driver_id, order_id], function (err) {
+    if (err) {
+      console.error("Update error:", err.message);
+      return res.status(500).json({ error: err.message });
+    }
+
+    if (this.changes === 0) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+
+    res.json({ success: true });
+  });
+};

@@ -253,8 +253,9 @@ function App() {
             <li key={order.id} style={{ marginBottom: "10px" }}>
               <strong>Order #{order.id}</strong>
               <br />
-              <em>Type:</em> {order.order_type}, <em>Payment:</em>{" "}
-              {order.payment_method}
+              <em>Type:</em> {order.order_type}
+              <br />
+              <em>Payment:</em> {order.payment_method}
               <br />
               <em>Customer:</em> {order.customer_name} ({order.phone_number})
               <br />
@@ -274,17 +275,20 @@ function App() {
               <br />
               <em>Time:</em> {new Date(order.created_at).toLocaleString()}{" "}
               <br />
-              <button
-                onClick={() => voidOrder(order.id)}
-                style={{ marginTop: "5px", color: "red" }}
-              >
-                ❌ Void
-              </button>
             </li>
           ))}
         </ul>
       )}
+      <button onClick={() => navigate("/void")} style={{ marginRight: "10px" }}>
+        Void Orders
+      </button>
       <button onClick={() => navigate("/settle")}>Daily Settle</button>
+      <button
+        onClick={() => navigate("/assign")}
+        style={{ marginLeft: "10px" }}
+      >
+        Assign Drivers
+      </button>
 
       <hr />
       <h2>🚚 Driver Management</h2>
