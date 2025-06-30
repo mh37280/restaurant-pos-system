@@ -31,8 +31,8 @@ exports.createOrder = (req, res) => {
   } = req.body;
 
   db.run(
-    `INSERT INTO orders (items, total, order_type, customer_name, phone_number, address, payment_method, driver_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO orders (items, total, order_type, customer_name, phone_number, address, payment_method, driver_id, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       JSON.stringify(items),
       total,
@@ -42,6 +42,7 @@ exports.createOrder = (req, res) => {
       address,
       payment_method,
       driver_id || null,
+      "open"
     ],
     function (err) {
       if (err) {
