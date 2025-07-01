@@ -9,14 +9,9 @@ function MenuPage() {
   const [selectedItems, setSelectedItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [filterCategory, setFilterCategory] = useState("all");
 
-  const {
-    customerName,
-    phoneNumber,
-    address,
-    orderType
-  } = state || {};
-
+  const { customerName, phoneNumber, address, orderType } = state || {};
   const customer_name = customerName;
   const phone_number = phoneNumber;
 
@@ -61,51 +56,101 @@ function MenuPage() {
 
     if (res.ok) {
       alert("Order placed!");
-      navigate("/"); // back to dashboard
+      navigate("/");
     } else {
       alert("Failed to place order.");
     }
   };
 
+  const cancelOrder = () => {
+    if (window.confirm("Cancel this order?")) {
+      navigate("/");
+    }
+  };
+
+  const categories = [...new Set(menu.map((item) => item.category))];
+  const filteredMenu = filterCategory === "all"
+    ? menu
+    : menu.filter((item) => item.category === filterCategory);
+
   return (
-    <div style={{ padding: "40px", fontFamily: "Arial" }}>
-      <h2>Menu</h2>
-      {loading ? (
-        <p>Loading menu...</p>
-      ) : (
+    <div style={{ display: "flex", height: "100vh", fontFamily: "Arial" }}>
+      <div style={{ width: "20%", borderRight: "1px solid #ccc", padding: "20px" }}>
+        <h3>Categories</h3>
+        <button onClick={() => setFilterCategory("all")}>All</button>
+        {categories.map((cat) => (
+          <button
+            key={cat}
+            onClick={() => setFilterCategory(cat)}
+            style={{ display: "block", marginTop: "10px" }}
+          >
+            {cat.charAt(0).toUpperCase() + cat.slice(1)}
+          </button>
+        ))}
+        <button
+          onClick={cancelOrder}
+          style={{ marginTop: "40px", backgroundColor: "#d32f2f", color: "white", padding: "10px", border: "none" }}
+        >
+          Cancel Order
+        </button>
+      </div>
+
+      <div style={{ width: "50%", padding: "20px", overflowY: "auto" }}>
+        <h2>Menu</h2>
+        {loading ? (
+          <p>Loading...</p>
+        ) : (
+          <ul>
+            {filteredMenu.map((item) => (
+              <li key={item.id} style={{ marginBottom: "10px" }}>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={selectedItems.some((i) => i.id === item.id)}
+                    onChange={() => toggleItem(item)}
+                  />
+                  {item.name} – ${item.price.toFixed(2)}
+                </label>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div style={{ width: "30%", padding: "20px", borderLeft: "1px solid #ccc", backgroundColor: "#f9f9f9" }}>
+        <h3>Receipt</h3>
+        <p><strong>Name:</strong> {customer_name}</p>
+        <p><strong>Phone:</strong> {phone_number}</p>
+        {orderType === "delivery" && <p><strong>Address:</strong> {address}</p>}
+        <hr />
         <ul>
-          {menu.map((item) => (
-            <li key={item.id}>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={selectedItems.some((i) => i.id === item.id)}
-                  onChange={() => toggleItem(item)}
-                />
-                {item.name} – ${item.price.toFixed(2)} ({item.category})
-              </label>
-            </li>
+          {selectedItems.map((item, idx) => (
+            <li key={idx}>{item.name} – ${item.price.toFixed(2)}</li>
           ))}
         </ul>
-      )}
-      <br />
-      <label>
-        Payment Method:
-        <select
-          value={paymentMethod}
-          onChange={(e) => setPaymentMethod(e.target.value)}
+        <hr />
+        <p><strong>Total:</strong> ${calculateTotal()}</p>
+        <label>
+          Payment Method:
+          <select
+            value={paymentMethod}
+            onChange={(e) => setPaymentMethod(e.target.value)}
+            style={{ marginLeft: "10px" }}
+          >
+            <option value="cash">Cash</option>
+            <option value="credit">Credit</option>
+            <option value="check">Check</option>
+          </select>
+        </label>
+        <br /><br />
+        <button
+          onClick={placeOrder}
+          disabled={selectedItems.length === 0}
+          style={{ backgroundColor: "#007bff", color: "white", padding: "10px", border: "none", width: "100%" }}
         >
-          <option value="cash">Cash</option>
-          <option value="credit">Credit</option>
-          <option value="check">Check</option>
-        </select>
-      </label>
-      <br /><br />
-      <strong>Total: ${calculateTotal()}</strong>
-      <br /><br />
-      <button onClick={placeOrder} disabled={selectedItems.length === 0}>
-        Place Order
-      </button>
+          Place Order
+        </button>
+      </div>
     </div>
   );
 }
