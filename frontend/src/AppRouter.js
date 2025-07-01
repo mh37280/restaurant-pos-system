@@ -10,6 +10,8 @@ import MenuPage from './pages/MenuPage';
 import OrderInfo from "./pages/OrderInfo";
 import DeliveryStatus from './pages/DeliveryStatus';
 import RecallOrders from './pages/RecallOrders';
+import BackOfficeHome from './pages/BackOfficeHome';
+import BackOfficeMenu from './pages/BackOfficeMenu';
 <Route path="/order" element={<OrderTypeSelector />} />
 
 function AppRouter() {
@@ -28,6 +30,10 @@ function AppRouter() {
         <Route path="/order/menu" element={<MenuPage />} />
         <Route path="/delivery-status" element={<DeliveryStatus />} />
         <Route path="/recall" element={<RecallOrders />} />
+        <Route path="/backoffice" element={<BackOfficeHome />} />
+        <Route path="/backoffice/menu" element={<BackOfficeMenu />} />
+
+
 
 
       </Routes>
