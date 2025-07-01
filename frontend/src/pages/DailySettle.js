@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import BackButton from "../components/BackButton";
 function DailySettle() {
   const [orders, setOrders] = useState([]);
   const [totals, setTotals] = useState({});
@@ -22,22 +23,10 @@ function DailySettle() {
 
   return (
     <div style={{ padding: "20px", fontFamily: "Arial" }}>
-      <button
-        onClick={() => navigate("/")}
-        style={{
-          background: "none",
-          border: "none",
-          padding: 0,
-          color: "black",
-          textDecoration: "underline",
-          cursor: "pointer",
-          fontSize: "16px",
-          fontFamily: "inherit",
-        }}
-      >
-        ⬅ Back to Main Page
-      </button>
+
       <h1>📊 Daily Settlement</h1>
+      <BackButton />
+
       {Object.keys(totals).length === 0 ? (
         <p>Loading...</p>
       ) : (

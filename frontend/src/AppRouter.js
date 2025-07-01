@@ -8,6 +8,8 @@ import OrderTypeSelector from './pages/OrderTypeSelector';
 import CustomerInfo from './pages/CustomerInfo';
 import MenuPage from './pages/MenuPage';
 import OrderInfo from "./pages/OrderInfo";
+import DeliveryStatus from './pages/DeliveryStatus';
+import RecallOrders from './pages/RecallOrders';
 <Route path="/order" element={<OrderTypeSelector />} />
 
 function AppRouter() {
@@ -22,8 +24,12 @@ function AppRouter() {
         <Route path="/settle" element={<DailySettle />} />
         <Route path="/assign" element={<AssignDrivers />} />
         <Route path="/" element={<OrderTypeSelector />} />
-        <Route path="/order/info" element={<OrderInfo />} />
+        {/* <Route path="/order/info" element={<OrderInfo />} /> */}
         <Route path="/order/menu" element={<MenuPage />} />
+        <Route path="/delivery-status" element={<DeliveryStatus />} />
+        <Route path="/recall" element={<RecallOrders />} />
+
+
       </Routes>
     </Router>
   );

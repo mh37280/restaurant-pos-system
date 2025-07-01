@@ -6,24 +6,58 @@
 
 .button-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 20px;
   max-width: 800px;
-  margin: 0 auto;
-  margin-top: 30px;
+  margin: 30px auto 0;
 }
 
 .dashboard-button {
-  padding: 30px;
-  font-size: 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 120px;
+  font-size: 20px;
   font-weight: bold;
-  border: 2px solid #444;
-  background-color: #ddd;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background-color 0.2s;
+  border: none;
+  border-radius: 12px;
+  background-color: #f0f0f0;
+  color: #333;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+  transition: transform 0.1s ease-in-out;
 }
 
-.dashboard-button:hover {
-  background-color: #bbb;
+.dashboard-button:active {
+  transform: scale(0.96);
+  background-color: #e0e0e0;
+}
+
+
+.red {
+  background-color: #d32f2f;
+}
+
+.green {
+  background-color: #388e3c;
+}
+
+.blue {
+  background-color: #1976d2;
+}
+
+.orange {
+  background-color: #f57c00;
+}
+
+.gray {
+  background-color: #616161;
+}
+
+.purple {
+  background-color: #7b1fa2;
+}
+
+.dashboard-button svg {
+  margin-bottom: 6px;
 }

@@ -10,7 +10,15 @@ function MenuPage() {
   const [loading, setLoading] = useState(true);
   const [paymentMethod, setPaymentMethod] = useState("cash");
 
-  const { customer_name, phone_number, address, orderType } = state || {};
+  const {
+    customerName,
+    phoneNumber,
+    address,
+    orderType
+  } = state || {};
+
+  const customer_name = customerName;
+  const phone_number = phoneNumber;
 
   useEffect(() => {
     fetch("/api/menu")
