@@ -12,7 +12,7 @@ function CustomerInfo() {
   const [address, setAddress] = useState("");
 
   const handleNext = () => {
-    if (!name || !phone || (orderType === "delivery" && !address)) {
+    if (!name || (orderType !== "to-go" && !phone) || (orderType === "delivery" && !address)) {
       alert("Please fill in all required fields.");
       return;
     }
@@ -51,15 +51,18 @@ function CustomerInfo() {
         />
       </label>
 
-      <label style={{ display: "block", marginBottom: "20px" }}>
-        Phone:<br />
-        <input
-          type="text"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          style={{ width: "100%", padding: "10px", fontSize: "16px" }}
-        />
-      </label>
+      {orderType !== "to-go" && (
+        <label style={{ display: "block", marginBottom: "20px" }}>
+          Phone:<br />
+          <input
+            type="text"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            style={{ width: "100%", padding: "10px", fontSize: "16px" }}
+          />
+        </label>
+      )}
+
 
       {orderType === "delivery" && (
         <label style={{ display: "block", marginBottom: "20px" }}>

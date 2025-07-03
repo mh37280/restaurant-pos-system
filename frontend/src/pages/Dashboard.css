@@ -22,42 +22,48 @@
   font-weight: bold;
   border: none;
   border-radius: 12px;
-  background-color: #f0f0f0;
-  color: #333;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
-  transition: transform 0.1s ease-in-out;
+  color: black;
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.2);
+  transition: all 0.15s ease-in-out;
+  background-image: linear-gradient(to bottom, #ffffff33, transparent);
+  position: relative;
+}
+
+.dashboard-button:hover {
+  filter: brightness(1.1);
+  cursor: pointer;
 }
 
 .dashboard-button:active {
-  transform: scale(0.96);
-  background-color: #e0e0e0;
-}
-
-
-.red {
-  background-color: #d32f2f;
-}
-
-.green {
-  background-color: #388e3c;
-}
-
-.blue {
-  background-color: #1976d2;
-}
-
-.orange {
-  background-color: #f57c00;
-}
-
-.gray {
-  background-color: #616161;
-}
-
-.purple {
-  background-color: #7b1fa2;
+  transform: translateY(3px);
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.2);
 }
 
 .dashboard-button svg {
   margin-bottom: 6px;
+}
+
+/* Colored Backgrounds with Gradient */
+.red {
+  background: linear-gradient(to bottom, #e53935, #b71c1c);
+}
+
+.green {
+  background: linear-gradient(to bottom, #43a047, #2e7d32);
+}
+
+.blue {
+  background: linear-gradient(to bottom, #1e88e5, #1565c0);
+}
+
+.orange {
+  background: linear-gradient(to bottom, #fb8c00, #ef6c00);
+}
+
+.gray {
+  background: linear-gradient(to bottom, #757575, #424242);
+}
+
+.purple {
+  background: linear-gradient(to bottom, #8e24aa, #6a1b9a);
 }
