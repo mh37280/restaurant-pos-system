@@ -12,7 +12,7 @@ function CustomerInfo() {
   const [address, setAddress] = useState("");
 
   const handleNext = () => {
-    if (!name || !phone || (orderType === "delivery" && !address)) {
+    if (!name || (orderType !== "to-go" && !phone) || (orderType === "delivery" && !address)) {
       alert("Please fill in all required fields.");
       return;
     }
