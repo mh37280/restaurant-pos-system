@@ -33,6 +33,7 @@ router.put("/mark-delivered", (req, res) => {
 
 router.get("/", orderController.getAllOrders);
 router.post("/", orderController.createOrder);
+router.put('/:id', orderController.updateOrder);
 router.delete('/:id', orderController.deleteOrder);
 router.put('/assign-driver', orderController.updateOrderDriver);
 
