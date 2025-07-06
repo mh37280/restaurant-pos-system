@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from "react";
 import BackButton from "../components/BackButton";
+import { useNavigate } from "react-router-dom";
 
 function RecallOrders() {
     const [orders, setOrders] = useState([]);
     const [filteredType, setFilteredType] = useState("all");
     const [searchTerm, setSearchTerm] = useState("");
     const [expandedOrders, setExpandedOrders] = useState({});
-
+    const navigate = useNavigate();
     useEffect(() => {
         fetch("/api/orders")
             .then((res) => res.json())
@@ -80,7 +81,7 @@ function RecallOrders() {
                         <th style={th}>Type</th>
                         <th style={th}>Total</th>
                         <th style={th}>Status</th>
-                        <th style={th}>Details</th>
+                        <th style={th}>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -101,10 +102,19 @@ function RecallOrders() {
                                     <td style={td}>${parseFloat(order.total).toFixed(2)}</td>
                                     <td style={td}>{order.status}</td>
                                     <td style={td}>
-                                        <button style={btn} onClick={() => toggleExpand(order.id)}>
-                                            {expandedOrders[order.id] ? "Hide" : "View"}
-                                        </button>
+                                        <div style={{ display: "flex", gap: "10px" }}>
+                                            <button style={btn} onClick={() => toggleExpand(order.id)}>
+                                                {expandedOrders[order.id] ? "Hide" : "View"}
+                                            </button>
+                                            <button
+                                                onClick={() => navigate("/recall/edit-order", { state: { order } })}
+                                                style={btn}
+                                            >
+                                                Edit
+                                            </button>
+                                        </div>
                                     </td>
+
                                 </tr>
 
                                 {expandedOrders[order.id] && (
@@ -113,7 +123,7 @@ function RecallOrders() {
                                             <div style={{ padding: "10px 20px" }}>
                                                 <h3 style={{ marginBottom: "5px" }}>Customer Info</h3>
                                                 <p><strong>Name:</strong> {order.customer_name || "—"}</p>
-                                                <p><strong>Phone:</strong> {order.phone_number || "—"}</p>
+                                                {order.order_type !== "to-go" && (<p><strong>Phone:</strong> {order.phone_number || "—"}</p>)}
                                                 {order.order_type === "delivery" && (
                                                     <p><strong>Address:</strong> {order.address || "—"}</p>
                                                 )}

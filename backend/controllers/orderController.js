@@ -87,3 +87,46 @@ exports.updateOrderDriver = (req, res) => {
     res.json({ success: true });
   });
 };
+
+exports.updateOrder = (req, res) => {
+  const id = parseInt(req.params.id);
+  if (!id) return res.status(400).json({ error: "Invalid ID" });
+
+  const {
+    items,
+    total,
+    order_type,
+    customer_name,
+    phone_number,
+    address,
+    payment_method,
+  } = req.body;
+
+  db.run(
+    `UPDATE orders
+     SET items = ?, total = ?, order_type = ?, customer_name = ?, phone_number = ?, address = ?, payment_method = ?
+     WHERE id = ?`,
+    [
+      JSON.stringify(items),
+      total,
+      order_type,
+      customer_name,
+      phone_number,
+      address,
+      payment_method,
+      id,
+    ],
+    function (err) {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ error: "Failed to update order" });
+      }
+
+      if (this.changes === 0) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+
+      res.status(200).json({ message: "Order updated successfully" });
+    }
+  );
+};
