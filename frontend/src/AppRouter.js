@@ -13,6 +13,7 @@ import RecallOrders from './pages/RecallOrders';
 import BackOfficeHome from './pages/BackOfficeHome';
 import BackOfficeMenu from './pages/BackOfficeMenu';
 import EditOrderPage from './pages/EditOrderPage';
+import BackOfficeDrivers from './pages/BackOfficeDrivers';
 <Route path="/order" element={<OrderTypeSelector />} />
 
 function AppRouter() {
@@ -33,6 +34,8 @@ function AppRouter() {
         <Route path="/recall" element={<RecallOrders />} />
         <Route path="/backoffice" element={<BackOfficeHome />} />
         <Route path="/backoffice/menu" element={<BackOfficeMenu />} />
+        <Route path="/backoffice/drivers" element={<BackOfficeDrivers />} />
+
         <Route path="/recall/edit-order" element={<EditOrderPage />} />
 
 

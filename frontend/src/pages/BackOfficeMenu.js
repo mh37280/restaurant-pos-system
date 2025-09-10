@@ -11,6 +11,7 @@ function BackOfficeMenu() {
     const [search, setSearch] = useState("");
     const [filterCategory, setFilterCategory] = useState("all");
     const [showNewCategory, setShowNewCategory] = useState(false);
+    const [showAddModal, setShowAddModal] = useState(false);
 
     useEffect(() => {
         fetchMenu();
@@ -75,41 +76,8 @@ function BackOfficeMenu() {
             <h1 style={{ marginBottom: "20px" }}>Menu Management</h1>
             <BackButton />
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px", maxWidth: "400px", marginBottom: "40px" }}>
-                <input value={name} onChange={e => setName(e.target.value)} placeholder="Item name" />
-                <input value={price} onChange={e => setPrice(e.target.value)} placeholder="Price" type="number" step="0.01" />
-                {!showNewCategory ? (
-                    <select
-                        value={category}
-                        onChange={(e) => {
-                            if (e.target.value === "__new__") {
-                                setShowNewCategory(true);
-                                setCategory("");
-                            } else {
-                                setCategory(e.target.value);
-                            }
-                        }}
-                    >
-                        <option value="">Select category</option>
-                        {categories.map((cat) => (
-                            <option key={cat} value={cat}>
-                                {cat.charAt(0).toUpperCase() + cat.slice(1)}
-                            </option>
-                        ))}
-                        <option value="__new__">+ Add new category</option>
-                    </select>
-                ) : (
-                    <input
-                        placeholder="New category name"
-                        value={category}
-                        onChange={(e) => setCategory(e.target.value)}
-                        onBlur={() => {
-                            if (!category) setShowNewCategory(false);
-                        }}
-                    />
-                )}
-                <button onClick={handleAdd} style={btn}>Add Item</button>
-            </div>
+
+
 
             {/* Filters and Search */}
             <div style={{ display: "flex", marginBottom: "20px", gap: "10px" }}>
@@ -132,6 +100,9 @@ function BackOfficeMenu() {
                     style={{ padding: "10px", flex: 1, maxWidth: "300px" }}
                 />
             </div>
+            <button onClick={() => setShowAddModal(true)} style={{ ...addBtn, marginBottom: "20px" }}>
+                + Add Item
+            </button>
 
             {/* Menu Items Table */}
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -165,12 +136,69 @@ function BackOfficeMenu() {
                             </td>
                             <td style={td}>
                                 {editingId === item.id ? (
-                                    <input
-                                        value={item.category}
-                                        onChange={(e) => setMenuItems(prev => prev.map(m => m.id === item.id ? { ...m, category: e.target.value } : m))}
-                                    />
-                                ) : item.category.charAt(0).toUpperCase() + item.category.slice(1)}
+                                    <>
+                                        {!item._showNewCategory ? (
+                                            <select
+                                                value={item.category}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    if (val === "__new__") {
+                                                        setMenuItems(prev =>
+                                                            prev.map(m =>
+                                                                m.id === item.id
+                                                                    ? { ...m, _showNewCategory: true, category: "" }
+                                                                    : m
+                                                            )
+                                                        );
+                                                    } else {
+                                                        setMenuItems(prev =>
+                                                            prev.map(m =>
+                                                                m.id === item.id ? { ...m, category: val } : m
+                                                            )
+                                                        );
+                                                    }
+                                                }}
+                                            >
+                                                <option value="">Select category</option>
+                                                {categories.map((cat) => (
+                                                    <option key={cat} value={cat}>
+                                                        {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                                                    </option>
+                                                ))}
+                                                <option value="__new__">+ Add new category</option>
+                                            </select>
+                                        ) : (
+                                            <input
+                                                placeholder="New category name"
+                                                value={item.category}
+                                                onChange={(e) =>
+                                                    setMenuItems(prev =>
+                                                        prev.map(m =>
+                                                            m.id === item.id
+                                                                ? { ...m, category: e.target.value }
+                                                                : m
+                                                        )
+                                                    )
+                                                }
+                                                onBlur={() => {
+                                                    if (!item.category) {
+                                                        setMenuItems(prev =>
+                                                            prev.map(m =>
+                                                                m.id === item.id
+                                                                    ? { ...m, _showNewCategory: false }
+                                                                    : m
+                                                            )
+                                                        );
+                                                    }
+                                                }}
+                                            />
+                                        )}
+                                    </>
+                                ) : (
+                                    item.category.charAt(0).toUpperCase() + item.category.slice(1)
+                                )}
                             </td>
+
                             <td style={td}>
                                 {editingId === item.id ? (
                                     <>
@@ -192,7 +220,55 @@ function BackOfficeMenu() {
             {filteredItems.length === 0 && (
                 <p style={{ marginTop: "20px", fontStyle: "italic" }}>No items found.</p>
             )}
+
+            {showAddModal && (
+                <div style={modalOverlay}>
+                    <div style={modalContent}>
+                        <h2 style={{ marginBottom: 16 }}>Add New Menu Item</h2>
+                        <input value={name} onChange={e => setName(e.target.value)} placeholder="Item name" />
+                        <input value={price} onChange={e => setPrice(e.target.value)} placeholder="Price" type="number" step="0.01" />
+                        {!showNewCategory ? (
+                            <select
+                                value={category}
+                                onChange={(e) => {
+                                    if (e.target.value === "__new__") {
+                                        setShowNewCategory(true);
+                                        setCategory("");
+                                    } else {
+                                        setCategory(e.target.value);
+                                    }
+                                }}
+                            >
+                                <option value="">Select category</option>
+                                {categories.map((cat) => (
+                                    <option key={cat} value={cat}>
+                                        {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                                    </option>
+                                ))}
+                                <option value="__new__">+ Add new category</option>
+                            </select>
+                        ) : (
+                            <input
+                                placeholder="New category name"
+                                value={category}
+                                onChange={(e) => setCategory(e.target.value)}
+                                onBlur={() => {
+                                    if (!category) setShowNewCategory(false);
+                                }}
+                            />
+                        )}
+
+                        <div style={{ display: "flex", gap: "10px", marginTop: "16px" }}>
+                            <button onClick={handleAdd} style={btn}>Add</button>
+                            <button onClick={() => setShowAddModal(false)} style={{ ...btn, backgroundColor: "gray" }}>Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
         </div>
+
+
     );
 }
 
@@ -205,6 +281,19 @@ const btn = {
     borderRadius: "4px",
     cursor: "pointer"
 };
+const addBtn = {
+    padding: "12px 24px",
+    fontSize: "18px",
+    fontWeight: "bold",
+    backgroundColor: "#007bff",
+    color: "#fff",
+    border: "none",
+    borderRadius: "8px",
+    cursor: "pointer",
+    boxShadow: "0 4px 12px rgba(0, 123, 255, 0.3)",
+    transition: "transform 0.2s ease, box-shadow 0.2s ease"
+};
+
 
 const th = {
     borderBottom: "2px solid #ccc",
@@ -216,6 +305,30 @@ const td = {
     borderBottom: "1px solid #eee",
     padding: "10px",
     verticalAlign: "top"
+};
+
+const modalOverlay = {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    width: "100vw",
+    height: "100vh",
+    backgroundColor: "rgba(0,0,0,0.5)",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 999
+};
+
+const modalContent = {
+    backgroundColor: "#fff",
+    padding: "24px",
+    borderRadius: "8px",
+    boxShadow: "0 0 12px rgba(0,0,0,0.3)",
+    display: "flex",
+    flexDirection: "column",
+    gap: "10px",
+    minWidth: "300px"
 };
 
 export default BackOfficeMenu;

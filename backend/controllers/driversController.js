@@ -18,3 +18,25 @@ exports.addDriver = (req, res) => {
     }
   );
 };
+
+exports.removeDriver = (req, res) => {
+  const id = req.params.id;
+  db.run('DELETE FROM drivers WHERE id = ?', [id], function (err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true });
+  });
+};
+
+exports.updateDriver = (req, res) => {
+  const { id } = req.params;
+  const { name, phone } = req.body;
+
+  db.run(
+    'UPDATE drivers SET name = ?, phone = ? WHERE id = ?',
+    [name, phone, id],
+    function (err) {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ success: true });
+    }
+  );
+};
