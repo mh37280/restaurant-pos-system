@@ -1,12 +1,39 @@
 import React, { useEffect, useState } from "react";
 import BackButton from "../components/BackButton";
 import { useNavigate } from "react-router-dom";
+import OrderDetailsModal from "../components/OrderDetailsModal";
+import { useRef } from "react";
+import { useReactToPrint } from "react-to-print";
+import ReceiptPrintView from "../components/ReceiptPrintView";
 
 function RecallOrders() {
     const [orders, setOrders] = useState([]);
     const [filteredType, setFilteredType] = useState("all");
     const [searchTerm, setSearchTerm] = useState("");
-    const [expandedOrders, setExpandedOrders] = useState({});
+    const [selectedOrder, setSelectedOrder] = useState(null);
+    const [printOrder, setPrintOrder] = useState(null);
+    const printRef = useRef();
+
+    const handlePrint = useReactToPrint({
+        contentRef: printRef,  // Changed from 'content' to 'contentRef'
+        documentTitle: "Receipt",
+        onAfterPrint: () => setPrintOrder(null)
+    });
+
+    useEffect(() => {
+        if (printOrder) {
+            const timeout = setTimeout(() => {
+                if (printRef.current) {
+                    handlePrint();
+                } else {
+                    console.warn("printRef is not ready yet");
+                }
+            }, 100);
+
+            return () => clearTimeout(timeout);
+        }
+    }, [printOrder, handlePrint]); // Added handlePrint to dependencies
+
     const navigate = useNavigate();
     useEffect(() => {
         fetch("/api/orders")
@@ -14,13 +41,6 @@ function RecallOrders() {
             .then((data) => setOrders(data))
             .catch((err) => console.error("Failed to load orders", err));
     }, []);
-
-    const toggleExpand = (id) => {
-        setExpandedOrders((prev) => ({
-            ...prev,
-            [id]: !prev[id],
-        }));
-    };
 
     const filteredOrders = orders.filter((order) => {
         const matchesType =
@@ -103,8 +123,8 @@ function RecallOrders() {
                                     <td style={td}>{order.status}</td>
                                     <td style={td}>
                                         <div style={{ display: "flex", gap: "10px" }}>
-                                            <button style={btn} onClick={() => toggleExpand(order.id)}>
-                                                {expandedOrders[order.id] ? "Hide" : "View"}
+                                            <button style={btn} onClick={() => setSelectedOrder(order)}>
+                                                View
                                             </button>
                                             <button
                                                 onClick={() => navigate("/recall/edit-order", { state: { order } })}
@@ -112,36 +132,15 @@ function RecallOrders() {
                                             >
                                                 Edit
                                             </button>
+                                            <button
+                                                onClick={() => setPrintOrder(order)}
+                                                style={btn}
+                                            >
+                                                Print
+                                            </button>
                                         </div>
                                     </td>
-
                                 </tr>
-
-                                {expandedOrders[order.id] && (
-                                    <tr>
-                                        <td colSpan="6" style={{ ...td, backgroundColor: "#f9f9f9" }}>
-                                            <div style={{ padding: "10px 20px" }}>
-                                                <h3 style={{ marginBottom: "5px" }}>Customer Info</h3>
-                                                <p><strong>Name:</strong> {order.customer_name || "—"}</p>
-                                                {order.order_type !== "to-go" && (<p><strong>Phone:</strong> {order.phone_number || "—"}</p>)}
-                                                {order.order_type === "delivery" && (
-                                                    <p><strong>Address:</strong> {order.address || "—"}</p>
-                                                )}
-                                                <hr style={{ margin: "10px 0" }} />
-                                                <h3 style={{ marginBottom: "5px" }}>Items</h3>
-                                                <ul style={{ paddingLeft: "20px", marginBottom: "10px" }}>
-                                                    {items.map((item, idx) => (
-                                                        <li key={idx}>
-                                                            {item.name} – ${item.price.toFixed(2)}
-                                                        </li>
-                                                    ))}
-                                                </ul>
-                                                <p><strong>Total:</strong> ${parseFloat(order.total).toFixed(2)}</p>
-                                                <p><strong>Order #:</strong> {order.id}</p>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                )}
                             </React.Fragment>
                         );
                     })}
@@ -150,6 +149,17 @@ function RecallOrders() {
 
             {filteredOrders.length === 0 && (
                 <p style={{ marginTop: "20px", fontStyle: "italic" }}>No orders found.</p>
+            )}
+            {selectedOrder && (
+                <OrderDetailsModal
+                    order={selectedOrder}
+                    onClose={() => setSelectedOrder(null)}
+                />
+            )}
+            {printOrder && (
+                <div style={{ position: "absolute", left: "-9999px", top: "-9999px" }}>
+                    <ReceiptPrintView ref={printRef} order={printOrder} />
+                </div>
             )}
         </div>
     );

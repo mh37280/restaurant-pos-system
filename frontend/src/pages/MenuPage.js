@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 function MenuPage() {
@@ -11,10 +11,17 @@ function MenuPage() {
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [filterCategory, setFilterCategory] = useState("all");
   const [selectedReceiptIndex, setSelectedReceiptIndex] = useState(null);
+  const receiptListRef = useRef(null);
 
   const { customerName, phoneNumber, address, orderType } = state || {};
   const customer_name = customerName;
   const phone_number = phoneNumber;
+
+  useEffect(() => {
+    if (receiptListRef.current) {
+      receiptListRef.current.scrollTop = receiptListRef.current.scrollHeight;
+    }
+  }, [selectedItems]);
 
   useEffect(() => {
     fetch("/api/menu")
@@ -37,7 +44,7 @@ function MenuPage() {
   const calculateTotal = () => calculateSubtotal() + calculateTax();
 
   const placeOrder = async () => {
-    const order = {
+    const orderData = {
       items: selectedItems.map(({ name, price }) => ({ name, price })),
       total: parseFloat(calculateTotal().toFixed(2)),
       order_type: orderType,
@@ -46,18 +53,35 @@ function MenuPage() {
       address,
       payment_method: paymentMethod,
       driver_id: null,
+      status: 'pending' // Add default status
     };
 
-    const res = await fetch("/api/orders", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(order),
-    });
+    try {
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(orderData),
+      });
 
-    if (res.ok) {
-      alert("Order placed!");
-      navigate("/");
-    } else {
+      if (res.ok) {
+        const apiResponse = await res.json();
+
+        // Create the complete order object for printing
+        // Combine the original order data with the ID from the API response
+        const completeOrder = {
+          ...orderData,
+          id: apiResponse.id || apiResponse.orderId || apiResponse.order_id, // Handle different possible ID field names
+          items: JSON.stringify(orderData.items) // Convert items to JSON string format expected by ReceiptPrintView
+        };
+
+        console.log("Complete order for printing:", completeOrder); // Debug log
+
+        navigate("/print-receipt", { state: { order: completeOrder } });
+      } else {
+        alert("Failed to place order.");
+      }
+    } catch (error) {
+      console.error("Error placing order:", error);
       alert("Failed to place order.");
     }
   };
@@ -75,7 +99,6 @@ function MenuPage() {
 
   return (
     <div style={{ display: "flex", height: "100vh", fontFamily: "Arial" }}>
-
       {/* Menu Section */}
       <div style={{ flex: 2, display: "flex", flexDirection: "column" }}>
         <div style={{ padding: "10px", borderBottom: "1px solid #ccc", display: "flex", alignItems: "center", gap: "10px" }}>
@@ -136,7 +159,6 @@ function MenuPage() {
           </button>
         </div>
 
-
         <div style={{ padding: "20px", overflowY: "auto" }}>
           {loading ? (
             <p>Loading menu...</p>
@@ -186,7 +208,6 @@ function MenuPage() {
             </div>
           )}
         </div>
-
       </div>
 
       {/* Receipt Section */}
@@ -199,7 +220,7 @@ function MenuPage() {
           <hr />
         </div>
 
-        <div style={{ padding: "0 20px", flex: 1, overflowY: "auto" }}>
+        <div style={{ padding: "0 20px", flex: 1, overflowY: "auto" }} ref={receiptListRef}>
           <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
             {selectedItems.map((item, idx) => (
               <li
@@ -305,8 +326,6 @@ function MenuPage() {
             Place Order
           </button>
         </div>
-
-
       </div>
     </div >
   );
