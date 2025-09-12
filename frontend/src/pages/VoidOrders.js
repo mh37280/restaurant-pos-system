@@ -33,7 +33,7 @@ function VoidOrders() {
     <div style={{ padding: "20px", fontFamily: "Arial" }}>
       <h1>❌ Void Orders</h1>
       <BackButton />
-      
+
       <div
         style={{
           display: "grid",
@@ -72,12 +72,26 @@ function VoidOrders() {
                   <li>No items</li>
                 ) : (
                   parsedItems.map((item, i) => (
-                    <li key={i}>
-                      {item.name} – ${item?.price ? item.price.toFixed(2) : "0.00"}
+                    <li key={i} style={{ marginBottom: "6px" }}>
+                      <div><strong>{item.name}</strong> – ${item?.price ? item.price.toFixed(2) : "0.00"}</div>
+                      {item.modifiers?.length > 0 && (
+                        <ul style={{ marginLeft: "12px", fontSize: "0.9em", color: "#555" }}>
+                          {item.modifiers.map((mod, j) => (
+                            <li key={j}>
+                              <strong>{mod.name}:</strong>{" "}
+                              {mod.options.map((opt) => {
+                                const price = opt.price_delta || 0;
+                                return `${opt.label}${price > 0 ? ` (+${price.toFixed(2)})` : ""}`;
+                              }).join(", ")}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     </li>
                   ))
                 )}
               </ul>
+
               <em>Total:</em> ${order.total?.toFixed(2) || "0.00"}
               <br />
               <em>Time:</em> {new Date(order.created_at).toLocaleString()}

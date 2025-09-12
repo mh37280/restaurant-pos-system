@@ -88,10 +88,23 @@ const ReceiptPrintView = forwardRef(({ order }, ref) => {
             {/* Items */}
             <div>
                 {items.map((item, i) => (
-                    <div key={i} style={thermalStyles.line}>
-                        {padLine(item.name, `$${item.price.toFixed(2)}`)}
+                    <div key={i} style={{ marginBottom: "4px" }}>
+                        <div style={thermalStyles.line}>
+                            {padLine(item.name, `$${item.price.toFixed(2)}`)}
+                        </div>
+
+                        {item.modifiers?.map((mod, j) => (
+                            <div key={j} style={{ ...thermalStyles.line, marginLeft: "10px", fontSize: "11px" }}>
+                                - {mod.name}: {mod.options.map((opt) => {
+                                    const price = opt.price_delta || 0;
+                                    return `${opt.label}${price > 0 ? ` (+${price.toFixed(2)})` : ""}`;
+                                }).join(", ")}
+
+                            </div>
+                        ))}
                     </div>
                 ))}
+
             </div>
 
             <div style={thermalStyles.separator}></div>

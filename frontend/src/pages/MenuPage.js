@@ -11,6 +11,9 @@ function MenuPage() {
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [filterCategory, setFilterCategory] = useState("all");
   const [selectedReceiptIndex, setSelectedReceiptIndex] = useState(null);
+  const [modalItem, setModalItem] = useState(null);
+  const [modifiers, setModifiers] = useState([]);
+  const [modifierSelections, setModifierSelections] = useState({});
   const receiptListRef = useRef(null);
 
   const { customerName, phoneNumber, address, orderType } = state || {};
@@ -32,20 +35,77 @@ function MenuPage() {
       });
   }, []);
 
-  const addItem = (item) => {
-    setSelectedItems([...selectedItems, item]);
+  const openItemModal = async (item) => {
+    const res = await fetch(`/api/modifiers/by-menu/${item.id}`);
+    const data = await res.json();
+    const initialSelections = {};
+    data.forEach((mod) => {
+      initialSelections[mod.id] = mod.is_multiple ? [] : "";
+    });
+    setModifierSelections(initialSelections);
+    setModifiers(data);
+    setModalItem(item);
+  };
+
+  const toggleModifier = (modifierId, optionId, isMultiple) => {
+    setModifierSelections((prev) => {
+      if (isMultiple) {
+        const current = prev[modifierId] || [];
+        return {
+          ...prev,
+          [modifierId]: current.includes(optionId)
+            ? current.filter((id) => id !== optionId)
+            : [...current, optionId],
+        };
+      } else {
+        return { ...prev, [modifierId]: optionId };
+      }
+    });
+  };
+
+  const confirmItemWithModifiers = () => {
+    const selectedMods = modifiers.map((mod) => {
+      const selection = modifierSelections[mod.id];
+      const selectedOptions = mod.is_multiple
+        ? mod.options.filter((opt) => selection.includes(opt.id))
+        : mod.options.filter((opt) => opt.id === selection);
+      return { name: mod.name, options: selectedOptions };
+    });
+
+    const modifierCost = selectedMods
+      .flatMap((m) => m.options)
+      .reduce((sum, opt) => sum + (opt.price_delta || 0), 0);
+
+    const finalItem = {
+      ...modalItem,
+      modifiers: selectedMods,
+      price: modalItem.price + modifierCost,
+    };
+
+    setSelectedItems((prev) => [...prev, finalItem]);
+    closeItemModal();
+  };
+
+  const closeItemModal = () => {
+    setModalItem(null);
+    setModifiers([]);
+    setModifierSelections({});
   };
 
   const calculateSubtotal = () =>
     selectedItems.reduce((sum, item) => sum + item.price, 0);
 
-  const calculateTax = () => (calculateSubtotal() * 0.06);
 
+  const calculateTax = () => calculateSubtotal() * 0.06;
   const calculateTotal = () => calculateSubtotal() + calculateTax();
 
   const placeOrder = async () => {
     const orderData = {
-      items: selectedItems.map(({ name, price }) => ({ name, price })),
+      items: selectedItems.map(({ name, price, modifiers }) => ({
+        name,
+        price,
+        modifiers,
+      })),
       total: parseFloat(calculateTotal().toFixed(2)),
       order_type: orderType,
       customer_name,
@@ -53,7 +113,7 @@ function MenuPage() {
       address,
       payment_method: paymentMethod,
       driver_id: null,
-      status: 'pending' // Add default status
+      status: "pending",
     };
 
     try {
@@ -65,16 +125,11 @@ function MenuPage() {
 
       if (res.ok) {
         const apiResponse = await res.json();
-
-        // Create the complete order object for printing
-        // Combine the original order data with the ID from the API response
         const completeOrder = {
           ...orderData,
-          id: apiResponse.id || apiResponse.orderId || apiResponse.order_id, // Handle different possible ID field names
-          items: JSON.stringify(orderData.items) // Convert items to JSON string format expected by ReceiptPrintView
+          id: apiResponse.id || apiResponse.orderId || apiResponse.order_id,
+          items: JSON.stringify(orderData.items),
         };
-
-        console.log("Complete order for printing:", completeOrder); // Debug log
 
         navigate("/print-receipt", { state: { order: completeOrder } });
       } else {
@@ -93,9 +148,7 @@ function MenuPage() {
   };
 
   const categories = [...new Set(menu.map((item) => item.category))];
-  const filteredMenu = filterCategory === "all"
-    ? menu
-    : menu.filter((item) => item.category === filterCategory);
+  const filteredMenu = filterCategory === "all" ? menu : menu.filter((item) => item.category === filterCategory);
 
   return (
     <div style={{ display: "flex", height: "100vh", fontFamily: "Arial" }}>
@@ -114,12 +167,11 @@ function MenuPage() {
                 backgroundColor: filterCategory === "all" ? "#333" : "#eee",
                 color: filterCategory === "all" ? "#fff" : "#333",
                 fontWeight: "bold",
-                cursor: "pointer"
+                cursor: "pointer",
               }}
             >
               All
             </button>
-
             {categories.map((cat) => (
               <button
                 key={cat}
@@ -133,7 +185,7 @@ function MenuPage() {
                   backgroundColor: cat === filterCategory ? "#333" : "#eee",
                   color: cat === filterCategory ? "#fff" : "#333",
                   fontWeight: "bold",
-                  cursor: "pointer"
+                  cursor: "pointer",
                 }}
               >
                 {cat.charAt(0).toUpperCase() + cat.slice(1)}
@@ -152,7 +204,7 @@ function MenuPage() {
               border: "none",
               borderRadius: "8px",
               cursor: "pointer",
-              fontWeight: "bold"
+              fontWeight: "bold",
             }}
           >
             Cancel
@@ -163,17 +215,11 @@ function MenuPage() {
           {loading ? (
             <p>Loading menu...</p>
           ) : (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))",
-                gap: "10px",
-              }}
-            >
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: "10px" }}>
               {filteredMenu.map((item) => (
                 <button
                   key={item.id}
-                  onClick={() => addItem(item)}
+                  onClick={() => openItemModal(item)}
                   style={{
                     height: "100px",
                     display: "flex",
@@ -237,7 +283,14 @@ function MenuPage() {
                   cursor: "pointer",
                 }}
               >
-                <p style={{ margin: 0 }}>{item.name}</p>
+                <div>
+                  <p style={{ margin: 0, fontWeight: "bold" }}>{item.name}</p>
+                  {item.modifiers?.map((mod, i) => (
+                    <div key={i} style={{ marginLeft: "10px", fontSize: "0.85em", color: "#555" }}>
+                      <strong>{mod.name}:</strong> {mod.options.map((opt) => opt.label).join(", ")}
+                    </div>
+                  ))}
+                </div>
                 <p style={{ margin: 0 }}>${item.price.toFixed(2)}</p>
               </li>
             ))}
@@ -320,14 +373,52 @@ function MenuPage() {
               border: "none",
               width: "100%",
               borderRadius: "6px",
-              cursor: "pointer"
+              cursor: "pointer",
             }}
           >
             Place Order
           </button>
         </div>
       </div>
-    </div >
+
+      {/* Modifier Modal */}
+      {modalItem && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: "rgba(0, 0, 0, 0.6)", zIndex: 10,
+          display: "flex", justifyContent: "center", alignItems: "center"
+        }}>
+          <div style={{ background: "#fff", padding: 20, borderRadius: 10, maxWidth: 400, width: "90%" }}>
+            <h3>{modalItem.name}</h3>
+            <p>${modalItem.price.toFixed(2)}</p>
+            {modifiers.map((mod) => (
+              <div key={mod.id} style={{ marginBottom: 10 }}>
+                <strong>{mod.name}</strong>
+                {mod.options.slice().reverse().map((opt) => (
+                  <label key={opt.id} style={{ display: "block" }}>
+                    <input
+                      type={mod.is_multiple ? "checkbox" : "radio"}
+                      name={`mod-${mod.id}`}
+                      value={opt.id}
+                      checked={mod.is_multiple
+                        ? modifierSelections[mod.id]?.includes(opt.id)
+                        : modifierSelections[mod.id] === opt.id}
+                      onChange={() => toggleModifier(mod.id, opt.id, mod.is_multiple)}
+                    />
+                    {opt.label} {opt.price_delta ? `(+${opt.price_delta.toFixed(2)})` : ""}
+                  </label>
+                ))}
+              </div>
+            ))}
+
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 20 }}>
+              <button onClick={closeItemModal} style={{ background: "gray", color: "white", padding: "8px 16px", border: "none", borderRadius: 4 }}>Cancel</button>
+              <button onClick={confirmItemWithModifiers} style={{ background: "#007bff", color: "white", padding: "8px 16px", border: "none", borderRadius: 4 }}>Add to Order</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 

@@ -46,6 +46,27 @@ db.serialize(() => {
       phone TEXT
     );
   `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS modifiers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      menu_id INTEGER,
+      is_required BOOLEAN DEFAULT 0,
+      is_multiple BOOLEAN DEFAULT 0,
+      FOREIGN KEY (menu_id) REFERENCES menu(id)
+    );
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS modifier_options (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      modifier_id INTEGER NOT NULL,
+      label TEXT NOT NULL,
+      price_delta REAL DEFAULT 0,
+      FOREIGN KEY (modifier_id) REFERENCES modifiers(id)
+    );
+  `);
 });
 
 module.exports = db;

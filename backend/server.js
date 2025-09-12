@@ -5,7 +5,7 @@ const bodyParser = require('body-parser');
 const menuRoutes = require('./routes/menuRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const driverRoutes = require('./routes/driverRoutes');
-
+const modifierRoutes = require('./routes/modifierRoutes')
 
 const app = express();
 
@@ -17,6 +17,7 @@ app.use(bodyParser.json());
 app.use('/api/menu', menuRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/drivers', driverRoutes);
+app.use("/api/modifiers", modifierRoutes);
 
 app.get('/', (req, res) => {
   res.send('POS Backend is running. Use /api/menu or /api/orders');
