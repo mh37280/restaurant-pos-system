@@ -1,0 +1,15 @@
+{
+  "name": "restaurant-pos-system",
+  "version": "1.0.0",
+  "main": "main.js",
+  "scripts": {
+    "start": "cd frontend && npm start",
+    "build": "cd frontend && npm run build",
+    "test": "cd frontend && npm test",
+    "eject": "cd frontend && npm run eject",
+    "electron": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^38.1.0"
+  }
+}
