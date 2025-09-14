@@ -13,9 +13,30 @@ function RecallOrders() {
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [printOrder, setPrintOrder] = useState(null);
     const printRef = useRef();
+    const [dateFilter, setDateFilter] = useState("today");
+
+    // Single useEffect to handle all order fetching
+    useEffect(() => {
+        let url = "/api/orders";
+        const params = new URLSearchParams();
+
+        if (dateFilter === "today") {
+            params.append("date", "today");
+        }
+        params.append("sort", "desc");
+
+        if (params.toString()) {
+            url += "?" + params.toString();
+        }
+
+        fetch(url)
+            .then((res) => res.json())
+            .then((data) => setOrders(data))
+            .catch((err) => console.error("Failed to load orders", err));
+    }, [dateFilter]);
 
     const handlePrint = useReactToPrint({
-        contentRef: printRef,  // Changed from 'content' to 'contentRef'
+        contentRef: printRef,
         documentTitle: "Receipt",
         onAfterPrint: () => setPrintOrder(null)
     });
@@ -32,21 +53,25 @@ function RecallOrders() {
 
             return () => clearTimeout(timeout);
         }
-    }, [printOrder, handlePrint]); // Added handlePrint to dependencies
+    }, [printOrder, handlePrint]);
 
     const navigate = useNavigate();
-    useEffect(() => {
-        fetch("/api/orders")
-            .then((res) => res.json())
-            .then((data) => setOrders(data))
-            .catch((err) => console.error("Failed to load orders", err));
-    }, []);
 
     const filteredOrders = orders.filter((order) => {
         const matchesType =
             filteredType === "all" || order.order_type === filteredType;
-        const matchesSearch =
-            searchTerm === "" || order.id.toString().includes(searchTerm);
+
+        let matchesSearch = true;
+        if (searchTerm !== "") {
+            if (dateFilter === "today") {
+                // On today view, search by ticket number
+                matchesSearch = order.ticket_number?.toString().includes(searchTerm);
+            } else {
+                // On all view, search by order ID
+                matchesSearch = order.id.toString().includes(searchTerm);
+            }
+        }
+
         return matchesType && matchesSearch;
     });
 
@@ -54,6 +79,37 @@ function RecallOrders() {
         <div style={{ padding: "30px", fontFamily: "Arial" }}>
             <h1>Recall Orders</h1>
             <BackButton />
+
+            <div style={{ marginBottom: "20px" }}>
+                <button
+                    onClick={() => setDateFilter("today")}
+                    style={{
+                        marginRight: "10px",
+                        padding: "8px 16px",
+                        backgroundColor: dateFilter === "today" ? "#28a745" : "#ccc",
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: "4px",
+                        cursor: "pointer",
+                    }}
+                >
+                    Today's Orders
+                </button>
+                <button
+                    onClick={() => setDateFilter("all")}
+                    style={{
+                        padding: "8px 16px",
+                        backgroundColor: dateFilter === "all" ? "#28a745" : "#ccc",
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: "4px",
+                        cursor: "pointer",
+                    }}
+                >
+                    All Orders
+                </button>
+            </div>
+
             {/* Filter Buttons */}
             <div style={{ marginBottom: "20px" }}>
                 {["all", "pickup", "to_go", "delivery"].map((type) => (
@@ -78,8 +134,9 @@ function RecallOrders() {
 
             {/* Search Input */}
             <input
+                key={dateFilter}
                 type="text"
-                placeholder="Search by Order #"
+                placeholder={dateFilter === "today" ? "Search by Ticket #" : "Search by Order #"}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 style={{
@@ -97,9 +154,11 @@ function RecallOrders() {
                 <thead>
                     <tr>
                         <th style={th}>Order #</th>
+                        <th style={th}>Ticket #</th>
                         <th style={th}>Customer</th>
                         <th style={th}>Type</th>
                         <th style={th}>Total</th>
+                        <th style={th}>Date</th>
                         <th style={th}>Status</th>
                         <th style={th}>Actions</th>
                     </tr>
@@ -111,6 +170,7 @@ function RecallOrders() {
                             <React.Fragment key={order.id}>
                                 <tr>
                                     <td style={td}>{order.id}</td>
+                                    <td style={td}>{order.ticket_number || "—"}</td>
                                     <td style={td}>{order.customer_name || "—"}</td>
                                     <td style={td}>
                                         {order.order_type === "to_go"
@@ -120,6 +180,7 @@ function RecallOrders() {
                                                 : "Unknown"}
                                     </td>
                                     <td style={td}>${parseFloat(order.total).toFixed(2)}</td>
+                                    <td style={td}>{new Date(order.created_at).toLocaleDateString("en-US")}</td>
                                     <td style={td}>{order.status}</td>
                                     <td style={td}>
                                         <div style={{ display: "flex", gap: "10px" }}>

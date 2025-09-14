@@ -15,6 +15,8 @@ import BackOfficeMenu from './pages/BackOfficeMenu';
 import EditOrderPage from './pages/EditOrderPage';
 import BackOfficeDrivers from './pages/BackOfficeDrivers';
 import PrintReceiptPage from './pages/PrintReceiptPage';
+import OperationsHome from './pages/OperationsHome';
+import OperationReports from './pages/OperationsReports';
 <Route path="/order" element={<OrderTypeSelector />} />
 
 function AppRouter() {
@@ -39,6 +41,11 @@ function AppRouter() {
 
         <Route path="/recall/edit-order" element={<EditOrderPage />} />
         <Route path="/print-receipt" element={<PrintReceiptPage />} />
+
+        <Route path="/operations" element={<OperationsHome />} />
+        <Route path="/operations/reports" element={<OperationReports />} />
+
+
 
 
 

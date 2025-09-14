@@ -33,36 +33,150 @@ exports.createOrder = (req, res) => {
     driver_id,
   } = req.body;
 
-  // Validate required fields
   if (!items || !total || !order_type) {
     return res.status(400).json({ error: "Missing required fields: items, total, order_type" });
   }
 
+  const todayStr = new Date().toISOString().split("T")[0]; // "YYYY-MM-DD"
+
+  // Step 1: Get max ticket number for today
+  db.get(
+    `SELECT MAX(ticket_number) AS lastTicket FROM orders WHERE DATE(created_at) = ?`,
+    [todayStr],
+    (err, row) => {
+      if (err) {
+        console.error("Ticket number lookup error:", err.message);
+        return res.status(500).json({ error: err.message });
+      }
+
+      const nextTicket = (row?.lastTicket || 0) + 1;
+
+      // Step 2: Insert order with ticket_number
+      const query = `
+        INSERT INTO orders (
+          items, total, order_type, customer_name, phone_number,
+          address, payment_method, driver_id, status, ticket_number
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+
+      const values = [
+        JSON.stringify(items),
+        total,
+        order_type,
+        customer_name || null,
+        phone_number || null,
+        address || null,
+        payment_method || "cash",
+        driver_id || null,
+        "open",
+        nextTicket
+      ];
+
+      db.run(query, values, function (err) {
+        if (err) {
+          console.error("Create order error:", err.message);
+          return res.status(500).json({ error: err.message });
+        }
+
+        res.json({
+          id: this.lastID,
+          ticket_number: nextTicket,
+          message: "Order created successfully"
+        });
+      });
+    }
+  );
+};
+
+exports.getNextTicket = (req, res) => {
+  const todayStr = new Date().toISOString().split("T")[0];
+
+  db.get(
+    `SELECT MAX(ticket_number) AS lastTicket FROM orders WHERE DATE(created_at) = ?`,
+    [todayStr],
+    (err, row) => {
+      if (err) {
+        console.error("Error fetching next ticket number:", err.message);
+        return res.status(500).json({ error: err.message });
+      }
+
+      const nextTicket = (row?.lastTicket || 0) + 1;
+      res.json({ nextTicket });
+    }
+  );
+};
+  
+
+exports.getTodaysOrders = (req, res) => {
+  const todayStr = new Date().toISOString().split("T")[0]; // "YYYY-MM-DD"
+
   const query = `
-    INSERT INTO orders (items, total, order_type, customer_name, phone_number, address, payment_method, driver_id, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    SELECT orders.*, drivers.name AS driver_name
+    FROM orders
+    LEFT JOIN drivers ON orders.driver_id = drivers.id
+    WHERE DATE(orders.created_at) = ?
+    ORDER BY orders.ticket_number ASC
   `;
 
-  const values = [
-    JSON.stringify(items),
-    total,
-    order_type,
-    customer_name || null,
-    phone_number || null,
-    address || null,
-    payment_method || "cash",
-    driver_id || null,
-    "open"
-  ];
-
-  db.run(query, values, function (err) {
+  db.all(query, [todayStr], (err, rows) => {
     if (err) {
-      console.error("Create order error:", err.message);
+      console.error("Get today's orders error:", err.message);
       return res.status(500).json({ error: err.message });
     }
-    res.json({ id: this.lastID, message: "Order created successfully" });
+
+    res.json(rows);
   });
 };
+
+exports.getFilteredOrders = (req, res) => {
+  const { date, start, end, type, status } = req.query;
+  const filters = [];
+  const params = [];
+
+  // Date filters
+  if (date === "today") {
+    filters.push("DATE(orders.created_at) = DATE('now', 'localtime')");
+  } else if (date) {
+    filters.push("DATE(orders.created_at) = ?");
+    params.push(date);
+  } else if (start && end) {
+    filters.push("DATE(orders.created_at) BETWEEN ? AND ?");
+    params.push(start, end);
+  }
+
+  // Order type (pickup, delivery, to_go)
+  if (type) {
+    filters.push("orders.order_type = ?");
+    params.push(type);
+  }
+
+  // Order status (open, pending, delivered, etc.)
+  if (status) {
+    filters.push("orders.status = ?");
+    params.push(status);
+  }
+
+  const whereClause = filters.length > 0 ? `WHERE ${filters.join(" AND ")}` : "";
+
+  const query = `
+    SELECT orders.*, drivers.name AS driver_name
+    FROM orders
+    LEFT JOIN drivers ON orders.driver_id = drivers.id
+    ${whereClause}
+    ORDER BY orders.ticket_number ${req.query.sort === "desc" ? "DESC" : "ASC"}
+  `;
+
+  db.all(query, params, (err, rows) => {
+    if (err) {
+      console.error("Get filtered orders error:", err.message);
+      return res.status(500).json({ error: err.message });
+    }
+
+    res.json(rows);
+  });
+};
+
 
 exports.updateOrder = (req, res) => {
   const id = parseInt(req.params.id);

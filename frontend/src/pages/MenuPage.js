@@ -20,6 +20,19 @@ function MenuPage() {
   const customer_name = customerName;
   const phone_number = phoneNumber;
 
+  const [ticketNumber, setTicketNumber] = useState(null);
+
+  useEffect(() => {
+    fetch("/api/orders/next-ticket")
+      .then((res) => res.json())
+      .then((data) => {
+        setTicketNumber(data.nextTicket);
+      })
+      .catch((err) => {
+        console.error("Failed to fetch ticket number:", err);
+      });
+  }, []);
+
   useEffect(() => {
     if (receiptListRef.current) {
       receiptListRef.current.scrollTop = receiptListRef.current.scrollHeight;
@@ -114,6 +127,7 @@ function MenuPage() {
       payment_method: paymentMethod,
       driver_id: null,
       status: "pending",
+      ticket_number: ticketNumber
     };
 
     try {
@@ -260,6 +274,11 @@ function MenuPage() {
       <div style={{ flex: 1, borderLeft: "1px solid #ccc", display: "flex", flexDirection: "column", backgroundColor: "#f9f9f9" }}>
         <div style={{ padding: "20px" }}>
           <h3>Receipt</h3>
+          {ticketNumber && (
+            <div style={{ padding: "10px", fontWeight: "bold", fontSize: "1.2rem" }}>
+              Ticket #{ticketNumber}
+            </div>
+          )}
           <p><strong>Name:</strong> {customer_name}</p>
           <p><strong>Phone:</strong> {phone_number}</p>
           {orderType === "delivery" && <p><strong>Address:</strong> {address}</p>}

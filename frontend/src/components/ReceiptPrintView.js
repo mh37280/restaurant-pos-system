@@ -46,6 +46,7 @@ const ReceiptPrintView = forwardRef(({ order }, ref) => {
             fontWeight: "bold"
         }
     };
+    console.log("🧾 Printing Order:", order);
 
     return (
         <div ref={ref} style={thermalStyles.container}>
@@ -63,7 +64,8 @@ const ReceiptPrintView = forwardRef(({ order }, ref) => {
 
             {/* Order Info */}
             <div style={thermalStyles.center}>
-                <h3 style={{ ...thermalStyles.bold, margin: "5px 0" }}>ORDER #{order.id}</h3>
+                <h3 style={{ ...thermalStyles.bold, margin: "5px 0" }}>TICKET #{order.ticket_number}</h3>
+                <p style={thermalStyles.line}>Order #{order.id}</p>
                 <p style={thermalStyles.line}>{new Date().toLocaleString()}</p>
             </div>
 
