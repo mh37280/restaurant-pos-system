@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from "react";
 import OrderItemsDropdown from "../components/OrderItemsDropdown";
 import BackButton from "../components/BackButton";
+import OrderDetailsModal from "../components/OrderDetailsModal";
 
 function DeliveryStatus() {
   const [orders, setOrders] = useState([]);
+  const [selectedOrder, setSelectedOrder] = useState(null);
 
   useEffect(() => {
     fetch("/api/orders")
@@ -51,12 +53,20 @@ function DeliveryStatus() {
                 </span>
               </td>
               <td style={{ ...td, position: "relative" }}>
-                <OrderItemsDropdown items={JSON.parse(order.items)} />
+                <button style={btn} onClick={() => setSelectedOrder(order)}>
+                  View Order
+                </button>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
+      {selectedOrder && (
+        <OrderDetailsModal
+          order={selectedOrder}
+          onClose={() => setSelectedOrder(null)}
+        />
+      )}
     </div>
   );
 }
@@ -71,6 +81,14 @@ const td = {
   borderBottom: "1px solid #eee",
   padding: "10px",
   verticalAlign: "top",
+};
+const btn = {
+  padding: "6px 12px",
+  backgroundColor: "#007bff",
+  color: "#fff",
+  border: "none",
+  borderRadius: "4px",
+  cursor: "pointer",
 };
 
 export default DeliveryStatus;

@@ -2,6 +2,7 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import { FaListAlt, FaUserTie } from "react-icons/fa";
 import "./Dashboard.css";
+import BackButton from "../components/BackButton";
 
 function BackOfficeHome() {
   const navigate = useNavigate();
@@ -24,6 +25,8 @@ function BackOfficeHome() {
   return (
     <div className="dashboard">
       <h1>Back Office</h1>
+
+      <BackButton />
       <div className="button-grid">
         {buttons.map((btn, index) => (
           <button

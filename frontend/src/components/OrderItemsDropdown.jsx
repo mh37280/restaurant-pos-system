@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 
-function OrderItemsDropdown({ items }) {
+function OrderItemsDropdown({ order }) {
     const [open, setOpen] = useState(false);
+    const items = JSON.parse(order.items || "[]");
 
     return (
         <div
@@ -20,7 +21,7 @@ function OrderItemsDropdown({ items }) {
                     cursor: "pointer",
                 }}
             >
-                {open ? "Hide Items" : "Show Items"}
+                {open ? "Hide Info" : "Show Info"}
             </button>
 
             {open && (
@@ -34,17 +35,30 @@ function OrderItemsDropdown({ items }) {
                         borderRadius: "6px",
                         boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
                         zIndex: 999,
-                        minWidth: "250px",
+                        minWidth: "300px",
                         padding: "10px",
+                        textAlign: "left"
                     }}
                 >
-                    <ul style={{ listStyle: "disc", margin: 0, paddingLeft: "20px" }}>
+                    <h4 style={{ marginBottom: 6 }}>Customer Info</h4>
+                    <p><strong>Name:</strong> {order.customer_name || "—"}</p>
+                    {order.order_type !== "to_go" && (
+                        <p><strong>Phone:</strong> {order.phone_number || "—"}</p>
+                    )}
+                    {order.order_type === "delivery" && (
+                        <p><strong>Address:</strong> {order.address || "—"}</p>
+                    )}
+
+                    <hr style={{ margin: "10px 0" }} />
+                    <h4 style={{ marginBottom: 6 }}>Items</h4>
+                    <ul style={{ paddingLeft: "20px", marginBottom: 10 }}>
                         {items.map((item, i) => (
-                            <li key={i}>
-                                {item.name} – ${item.price.toFixed(2)}
-                            </li>
+                            <li key={i}>{item.name} – ${item.price.toFixed(2)}</li>
                         ))}
                     </ul>
+
+                    <p><strong>Total:</strong> ${parseFloat(order.total).toFixed(2)}</p>
+                    <p><strong>Order #:</strong> {order.id}</p>
                 </div>
             )}
         </div>
