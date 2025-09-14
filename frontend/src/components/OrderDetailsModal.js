@@ -49,9 +49,25 @@ function OrderDetailsModal({ order, onClose }) {
         <h3 style={{ marginTop: 10 }}>Items</h3>
         <ul style={{ paddingLeft: "20px", marginBottom: 10 }}>
           {items.map((item, i) => (
-            <li key={i}>{item.name} – ${item.price.toFixed(2)}</li>
+            <li key={i} style={{ marginBottom: "6px" }}>
+              <div><strong>{item.name}</strong> – ${item.price.toFixed(2)}</div>
+              {item.modifiers?.length > 0 && (
+                <ul style={{ paddingLeft: "15px", fontSize: "0.9em", color: "#555" }}>
+                  {item.modifiers.map((mod, j) => (
+                    <li key={j}>
+                      <strong>{mod.name}:</strong>{" "}
+                      {mod.options.map((opt) => {
+                        const price = opt.price_delta || 0;
+                        return `${opt.label}${price > 0 ? ` (+${price.toFixed(2)})` : ""}`;
+                      }).join(", ")}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
           ))}
         </ul>
+
         <p><strong>Total:</strong> ${parseFloat(order.total).toFixed(2)}</p>
         <p><strong>Status:</strong> {order.status}</p>
         <p><strong>Type:</strong> {order.order_type.replace("_", " ")}</p>

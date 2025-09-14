@@ -42,7 +42,7 @@ function Dashboard() {
     { label: "Refund", path: "#", color: "orange", icon: <BiMoneyWithdraw size={28} /> },
     { label: "Pay Out", path: "#", color: "orange", icon: <GiReceiveMoney size={28} /> },
 
-    { label: "Operations", path: "#", color: "purple", icon: <FaTools size={28} /> },
+    { label: "Operations", path: "/operations", color: "purple", icon: <FaTools size={28} /> },
     { label: "Back Office", path: "/backoffice", color: "purple", icon: <VscFolderActive size={28} /> },
 
     { label: "No Sale", path: "#", color: "gray", icon: <MdMoneyOff size={28} /> },

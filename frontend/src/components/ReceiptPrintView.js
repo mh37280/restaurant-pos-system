@@ -46,6 +46,7 @@ const ReceiptPrintView = forwardRef(({ order }, ref) => {
             fontWeight: "bold"
         }
     };
+    console.log("🧾 Printing Order:", order);
 
     return (
         <div ref={ref} style={thermalStyles.container}>
@@ -63,7 +64,8 @@ const ReceiptPrintView = forwardRef(({ order }, ref) => {
 
             {/* Order Info */}
             <div style={thermalStyles.center}>
-                <h3 style={{ ...thermalStyles.bold, margin: "5px 0" }}>ORDER #{order.id}</h3>
+                <h3 style={{ ...thermalStyles.bold, margin: "5px 0" }}>TICKET #{order.ticket_number}</h3>
+                <p style={thermalStyles.line}>Order #{order.id}</p>
                 <p style={thermalStyles.line}>{new Date().toLocaleString()}</p>
             </div>
 
@@ -88,10 +90,23 @@ const ReceiptPrintView = forwardRef(({ order }, ref) => {
             {/* Items */}
             <div>
                 {items.map((item, i) => (
-                    <div key={i} style={thermalStyles.line}>
-                        {padLine(item.name, `$${item.price.toFixed(2)}`)}
+                    <div key={i} style={{ marginBottom: "4px" }}>
+                        <div style={thermalStyles.line}>
+                            {padLine(item.name, `$${item.price.toFixed(2)}`)}
+                        </div>
+
+                        {item.modifiers?.map((mod, j) => (
+                            <div key={j} style={{ ...thermalStyles.line, marginLeft: "10px", fontSize: "11px" }}>
+                                - {mod.name}: {mod.options.map((opt) => {
+                                    const price = opt.price_delta || 0;
+                                    return `${opt.label}${price > 0 ? ` (+${price.toFixed(2)})` : ""}`;
+                                }).join(", ")}
+
+                            </div>
+                        ))}
                     </div>
                 ))}
+
             </div>
 
             <div style={thermalStyles.separator}></div>
