@@ -8,6 +8,9 @@ const driverRoutes = require('./routes/driverRoutes');
 const modifierRoutes = require('./routes/modifierRoutes')
 const settlementsRoutes = require("./routes/settlements");
 
+const geocodeRoutes = require('./routes/geocodeRoutes');
+
+
 const app = express();
 
 const PORT = 3001;
@@ -20,6 +23,8 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/drivers', driverRoutes);
 app.use("/api/modifiers", modifierRoutes);
 app.use("/api/settlements", settlementsRoutes);
+app.use('/api', geocodeRoutes);
+
 
 app.get('/', (req, res) => {
   res.send('POS Backend is running. Use /api/menu or /api/orders');
