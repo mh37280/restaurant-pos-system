@@ -31,6 +31,8 @@ exports.createOrder = (req, res) => {
     address,
     payment_method,
     driver_id,
+    cash_received,
+    card_amount
   } = req.body;
 
   if (!items || !total || !order_type) {
@@ -53,12 +55,13 @@ exports.createOrder = (req, res) => {
 
       // Step 2: Insert order with ticket_number
       const query = `
-        INSERT INTO orders (
-          items, total, order_type, customer_name, phone_number,
-          address, payment_method, driver_id, status, ticket_number
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `;
+  INSERT INTO orders (
+    items, total, order_type, customer_name, phone_number,
+    address, payment_method, driver_id, status, ticket_number,
+    cash_received, card_amount
+  )
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+`;
 
       const values = [
         JSON.stringify(items),
@@ -70,7 +73,9 @@ exports.createOrder = (req, res) => {
         payment_method || "cash",
         driver_id || null,
         "open",
-        nextTicket
+        nextTicket,
+        cash_received || null,
+        card_amount || null
       ];
 
       db.run(query, values, function (err) {
@@ -106,7 +111,7 @@ exports.getNextTicket = (req, res) => {
     }
   );
 };
-  
+
 
 exports.getTodaysOrders = (req, res) => {
   const todayStr = new Date().toISOString().split("T")[0]; // "YYYY-MM-DD"

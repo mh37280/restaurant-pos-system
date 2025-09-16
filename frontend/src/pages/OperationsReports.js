@@ -95,9 +95,16 @@ function OperationReports() {
 
     // Calculate summary metrics
     const calculateSummary = () => {
-        const totalRevenue = Object.values(reportData).reduce((sum, methods) => {
-            return sum + Object.values(methods).reduce((methodSum, amount) => methodSum + Number(amount || 0), 0);
-        }, 0);
+        let totalRevenue = 0;
+        const paymentMethods = { cash: 0, card: 0 };
+
+        Object.entries(reportData).forEach(([date, methods]) => {
+            const cash = parseFloat(methods.cash || 0);
+            const card = parseFloat(methods.card || 0);
+            paymentMethods.cash += cash;
+            paymentMethods.card += card;
+            totalRevenue += cash + card;
+        });
 
         const totalOrders = orderDetails.length;
         const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
@@ -113,13 +120,6 @@ function OperationReports() {
             return acc;
         }, {});
 
-        const paymentMethods = {};
-        Object.values(reportData).forEach(methods => {
-            Object.entries(methods).forEach(([method, amount]) => {
-                paymentMethods[method] = (paymentMethods[method] || 0) + Number(amount || 0);
-            });
-        });
-
         return {
             totalRevenue,
             totalOrders,
@@ -130,6 +130,7 @@ function OperationReports() {
             dateRange: Object.keys(reportData).length
         };
     };
+
 
     // Find peak day
     const getPeakDay = () => {
@@ -348,7 +349,7 @@ function OperationReports() {
                                     {Object.entries(reportData)
                                         .sort(([a], [b]) => new Date(b) - new Date(a))
                                         .map(([date, methods]) => {
-                                            const dailyTotal = Object.values(methods).reduce((sum, amount) => sum + Number(amount || 0), 0);
+                                            const dailyTotal = (parseFloat(methods.cash || 0) + parseFloat(methods.card || 0));
                                             return (
                                                 <tr key={date} style={{ backgroundColor: date === peakDay ? "#fff3cd" : "transparent" }}>
                                                     <td style={tableCell}>

@@ -14,10 +14,15 @@ function DailySettle() {
         setOrders(data);
 
         const breakdown = data.reduce((acc, order) => {
-          const method = order.payment_method;
-          acc[method] = (acc[method] || 0) + order.total;
+          if (order.payment_method === "split") {
+            acc["cash"] = (acc["cash"] || 0) + (parseFloat(order.cash_received) || 0);
+            acc["card"] = (acc["card"] || 0) + (parseFloat(order.card_amount) || 0);
+          } else {
+            acc[order.payment_method] = (acc[order.payment_method] || 0) + order.total;
+          }
           return acc;
         }, {});
+
         setTotals(breakdown);
       });
   }, []);
@@ -61,22 +66,22 @@ function DailySettle() {
       ) : (
         <div>
           {/* Summary Cards */}
-          <div style={{ 
-            display: "grid", 
-            gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", 
-            gap: "16px", 
-            marginBottom: 30 
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+            gap: "16px",
+            marginBottom: 30
           }}>
             <div style={summaryCard}>
               <h3 style={cardTitle}>💰 Total Revenue</h3>
               <p style={cardValue}>${totalRevenue.toFixed(2)}</p>
             </div>
-            
+
             <div style={summaryCard}>
               <h3 style={cardTitle}>📦 Total Orders</h3>
               <p style={cardValue}>{totalOrders}</p>
             </div>
-            
+
             <div style={summaryCard}>
               <h3 style={cardTitle}>📊 Avg Order Value</h3>
               <p style={cardValue}>${avgOrderValue.toFixed(2)}</p>
@@ -128,11 +133,11 @@ function DailySettle() {
           }}>
             <h3 style={{ ...cardTitle, color: "#28a745" }}>📅 Settlement Date</h3>
             <p style={{ ...cardValue, color: "#28a745" }}>
-              {new Date().toLocaleDateString('en-US', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
+              {new Date().toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
               })}
             </p>
           </div>

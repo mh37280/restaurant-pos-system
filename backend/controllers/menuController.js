@@ -53,3 +53,16 @@ exports.updateMenuItem = (req, res) => {
     }
   );
 };
+
+
+exports.toggleAvailability = async (req, res) => {
+  const id = req.params.id;
+  const { available } = req.body;
+
+  db.run(`UPDATE menu SET available = ? WHERE id = ?`, [available, id], function (err) {
+    if (err) {
+      return res.status(500).json({ error: "Failed to update availability" });
+    }
+    res.json({ success: true, available });
+  });
+};

@@ -23,6 +23,17 @@ function OrderDetailsModal({ order, onClose }) {
     };
   }, [onClose]);
 
+  const paymentDisplay = order.cash_received && order.card_amount
+    ? `Cash: $${parseFloat(order.cash_received).toFixed(2)}, Card: $${parseFloat(order.card_amount).toFixed(2)}`
+    : order.cash_received
+      ? `Cash: $${parseFloat(order.cash_received).toFixed(2)}`
+      : order.card_amount
+        ? `Card: $${parseFloat(order.card_amount).toFixed(2)}`
+        : order.payment_method
+          ? order.payment_method.charAt(0).toUpperCase() + order.payment_method.slice(1)
+          : "—";
+
+
   return (
     <div style={overlay}>
       <div
@@ -50,7 +61,16 @@ function OrderDetailsModal({ order, onClose }) {
         <ul style={{ paddingLeft: "20px", marginBottom: 10 }}>
           {items.map((item, i) => (
             <li key={i} style={{ marginBottom: "6px" }}>
-              <div><strong>{item.name}</strong> – ${item.price.toFixed(2)}</div>
+              <div>
+                <strong>
+                  {item.quantity && item.quantity > 1 ? `${item.quantity}x ` : ""}
+                  {item.name}
+                </strong> – $
+                {(item.quantity && item.quantity > 1
+                  ? item.price * item.quantity
+                  : item.price
+                ).toFixed(2)}
+              </div>
               {item.modifiers?.length > 0 && (
                 <ul style={{ paddingLeft: "15px", fontSize: "0.9em", color: "#555" }}>
                   {item.modifiers.map((mod, j) => (
@@ -69,6 +89,8 @@ function OrderDetailsModal({ order, onClose }) {
         </ul>
 
         <p><strong>Total:</strong> ${parseFloat(order.total).toFixed(2)}</p>
+        <p><strong>Payment:</strong> {paymentDisplay}</p>
+
         <p><strong>Status:</strong> {order.status}</p>
         <p><strong>Type:</strong> {order.order_type.replace("_", " ")}</p>
       </div>

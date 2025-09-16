@@ -20,9 +20,11 @@ db.serialize(() => {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT,
       price REAL,
-      category TEXT
+      category TEXT,
+      available BOOLEAN DEFAULT 1
     );
   `);
+
 
   db.run(`
   CREATE TABLE IF NOT EXISTS orders (
@@ -38,6 +40,8 @@ db.serialize(() => {
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     ticket_number INTEGER,
     status TEXT DEFAULT 'open',
+    cash_received REAL DEFAULT NULL,
+    card_amount REAL DEFAULT NULL,
     FOREIGN KEY (driver_id) REFERENCES drivers(id)
   );
 `);

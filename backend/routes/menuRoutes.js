@@ -7,5 +7,7 @@ router.post('/', menuController.addMenuItem);
 router.delete('/:id', menuController.deleteMenuItem);
 router.put('/:id', menuController.updateMenuItem);
 
+router.put('/:id/availability', menuController.toggleAvailability);
+
 
 module.exports = router;

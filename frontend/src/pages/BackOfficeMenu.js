@@ -143,6 +143,32 @@ function BackOfficeMenu() {
         } else alert("Failed to update item");
     };
 
+    const handleAvailabilityChange = async (id, newStatus) => {
+        try {
+            const res = await fetch(`/api/menu/${id}/availability`, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ available: newStatus })
+            });
+
+            if (!res.ok) throw new Error("Failed to update availability");
+
+            // Update local state
+            setMenuItems((prevMenu) =>
+                prevMenu.map((item) =>
+                    item.id === id ? { ...item, available: newStatus ? 1 : 0 } : item
+                )
+            );
+        } catch (err) {
+            console.error(err);
+            alert("Could not update availability.");
+        }
+    };
+
+
+
     // Modifier functions
     const handleAddModifier = async (modifierData) => {
         const res = await fetch("http://localhost:3001/api/modifiers", {
@@ -311,6 +337,8 @@ function BackOfficeMenu() {
                         <th style={th}>Category</th>
                         <th style={th}>Modifiers</th>
                         <th style={th}>Actions</th>
+                        <th style={th}>Availability</th>
+
                     </tr>
                 </thead>
                 <tbody>
@@ -318,7 +346,7 @@ function BackOfficeMenu() {
                         const itemModifiers = getModifiersForItem(item.id);
                         return (
                             <tr key={item.id}>
-                                <td style={td}>
+                                <td style={{ ...td, maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                     {editingId === item.id ? (
                                         <input
                                             value={item.name}
@@ -413,6 +441,8 @@ function BackOfficeMenu() {
                                     </div>
                                 </td>
                                 <td style={td}>
+
+                                    {/* Edit / Remove Buttons */}
                                     {editingId === item.id ? (
                                         <>
                                             <button onClick={() => handleEdit(item.id, item)} style={btn}>Save</button>
@@ -425,6 +455,31 @@ function BackOfficeMenu() {
                                         </>
                                     )}
                                 </td>
+                                <td style={{ ...td, width: "120px", textAlign: "left" }}>
+                                    <label style={{ display: "inline-flex", alignItems: "center", cursor: "pointer" }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={item.available === 1}
+                                            onChange={() => handleAvailabilityChange(item.id, !item.available)}
+                                            style={{
+                                                appearance: "none",
+                                                width: "18px",
+                                                height: "18px",
+                                                border: "2px solid #28a745",
+                                                borderRadius: "4px",
+                                                backgroundColor: item.available ? "#28a745" : "#fff",
+                                                display: "inline-block",
+                                                marginRight: "6px",
+                                                transition: "all 0.2s"
+                                            }}
+                                        />
+                                        <span style={{ color: item.available ? "#28a745" : "#999", fontWeight: 500 }}>
+                                            {item.available ? "Available" : "Unavailable"}
+                                        </span>
+                                    </label>
+                                </td>
+
+
                             </tr>
                         );
                     })}

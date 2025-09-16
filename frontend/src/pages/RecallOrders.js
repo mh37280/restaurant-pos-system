@@ -158,6 +158,7 @@ function RecallOrders() {
                         <th style={th}>Customer</th>
                         <th style={th}>Type</th>
                         <th style={th}>Total</th>
+                        <th style={th}>Payment</th>
                         <th style={th}>Date</th>
                         <th style={th}>Status</th>
                         <th style={th}>Actions</th>
@@ -171,8 +172,9 @@ function RecallOrders() {
                                 <tr>
                                     <td style={td}>{order.id}</td>
                                     <td style={td}>{order.ticket_number || "—"}</td>
-                                    <td style={td}>{order.customer_name || "—"}</td>
                                     <td style={td}>
+                                        <div title={order.customer_name}>{order.customer_name || "—"}</div>
+                                    </td>                                    <td style={td}>
                                         {order.order_type === "to_go"
                                             ? "To Go"
                                             : order.order_type
@@ -180,6 +182,17 @@ function RecallOrders() {
                                                 : "Unknown"}
                                     </td>
                                     <td style={td}>${parseFloat(order.total).toFixed(2)}</td>
+                                    <td style={td}>
+                                        {order.cash_received && order.card_amount
+                                            ? "Split"
+                                            : order.cash_received
+                                                ? "Cash"
+                                                : order.card_amount
+                                                    ? "Card"
+                                                    : order.payment_method
+                                                        ? order.payment_method.charAt(0).toUpperCase() + order.payment_method.slice(1)
+                                                        : "—"}
+                                    </td>
                                     <td style={td}>{new Date(order.created_at).toLocaleDateString("en-US")}</td>
                                     <td style={td}>{order.status}</td>
                                     <td style={td}>
@@ -235,8 +248,13 @@ const th = {
 const td = {
     borderBottom: "1px solid #eee",
     padding: "10px",
-    verticalAlign: "top",
+    verticalAlign: "middle",
+    maxWidth: "150px",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
 };
+
 
 const btn = {
     padding: "6px 12px",
