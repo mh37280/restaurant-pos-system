@@ -55,7 +55,7 @@ function Dashboard() {
 
   return (
     <div className="dashboard">
-      <h1>Aldelo POS – Lite Edition</h1>
+      <h1>POS</h1>
       <div className="button-grid">
         {buttons.map((btn, index) => (
           <button

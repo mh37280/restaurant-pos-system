@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { FaListAlt, FaUserTie } from "react-icons/fa";
+import { FaListAlt, FaUserTie, FaMapMarkerAlt } from "react-icons/fa";
 import "./Dashboard.css";
 import BackButton from "../components/BackButton";
 
@@ -19,6 +19,12 @@ function BackOfficeHome() {
       path: "/backoffice/drivers",
       color: "purple",
       icon: <FaUserTie size={28} />
+    },
+    {
+      label: "Store Location",
+      path: "/backoffice/store",
+      color: "purple",
+      icon: <FaMapMarkerAlt size={28} />
     }
   ];
 

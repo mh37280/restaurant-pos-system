@@ -7,7 +7,7 @@ function AddressAutocomplete({
   value,
   onChange,
   onSelect,
-  placeholder = "123 Main St, Philadelphia…",
+  placeholder = "123 Main St, Philadelphia...",
   minChars = 3,
   debounceMs = 250
 }) {
@@ -112,7 +112,7 @@ function AddressAutocomplete({
           }}
         >
           {loading && (
-            <div style={{ padding: 10, fontSize: 13 }}>Searching…</div>
+            <div style={{ padding: 10, fontSize: 13 }}>Searching...</div>
           )}
           {!loading && items.length === 0 && (
             <div style={{ padding: 10, fontSize: 13, color: "#666" }}>
@@ -163,6 +163,16 @@ function CustomerInfo() {
   const [st, setSt] = useState("");
   const [zip, setZip] = useState("");
 
+  const buildFormattedAddress = () => {
+    const parts = [];
+    if (address && address.trim()) parts.push(address.trim());
+    if (city && city.trim()) parts.push(city.trim());
+    const stateZipParts = [st, zip]
+      .map((part) => (part || "").trim())
+      .filter(Boolean);
+    if (stateZipParts.length) parts.push(stateZipParts.join(" "));
+    return parts.join(", ");
+  };
   function handleSelectSuggestion(s) {
     // s = { label, display_name, lat, lon, raw:{...} }
     setAddress(s.label || s.display_name || "");
@@ -178,12 +188,14 @@ function CustomerInfo() {
       alert("Please fill in all required fields.");
       return;
     }
-    if (orderType === "delivery" && !address) {
+
+    const formattedAddress = buildFormattedAddress();
+
+    if (orderType === "delivery" && !formattedAddress) {
       alert("Please enter the delivery address.");
       return;
     }
 
-    // Build payload for next page
     const base = {
       orderType,
       customerName: name,
@@ -193,12 +205,12 @@ function CustomerInfo() {
     const deliveryExtra =
       orderType === "delivery"
         ? {
-            address,
+            address: formattedAddress,
             city,
             state: st,
             zip,
-            lat: coords?.lat || null,
-            lon: coords?.lon || null
+            lat: coords?.lat ?? null,
+            lon: coords?.lon ?? null
           }
         : { address: "" };
 
@@ -217,7 +229,7 @@ function CustomerInfo() {
       }}
     >
       <h1 style={{ textAlign: "center", marginBottom: "30px" }}>
-        {orderType.charAt(0).toUpperCase() + orderType.slice(1)} – Customer Info
+        {orderType.charAt(0).toUpperCase() + orderType.slice(1)} - Customer Info
       </h1>
 
       <BackButton />
@@ -255,7 +267,7 @@ function CustomerInfo() {
               value={address}
               onChange={setAddress}
               onSelect={handleSelectSuggestion}
-              placeholder="Start typing address…"
+              placeholder="Start typing address..."
             />
           </label>
 

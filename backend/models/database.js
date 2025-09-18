@@ -1,6 +1,6 @@
-const sqlite3 = require('sqlite3').verbose();
+﻿const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
-const { promisify } = require("util");
+const { promisify } = require('util');
 
 // Use absolute path so it's always correct
 const dbPath = path.join(__dirname, '..', 'menu.db');
@@ -25,28 +25,25 @@ db.serialize(() => {
     );
   `);
 
-
   db.run(`
-  CREATE TABLE IF NOT EXISTS orders (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    items TEXT,
-    total REAL,
-    order_type TEXT,
-    customer_name TEXT,
-    phone_number TEXT,
-    address TEXT,
-    payment_method TEXT,
-    driver_id INTEGER,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    ticket_number INTEGER,
-    status TEXT DEFAULT 'open',
-    cash_received REAL DEFAULT NULL,
-    card_amount REAL DEFAULT NULL,
-    FOREIGN KEY (driver_id) REFERENCES drivers(id)
-  );
-`);
-
-
+    CREATE TABLE IF NOT EXISTS orders (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      items TEXT,
+      total REAL,
+      order_type TEXT,
+      customer_name TEXT,
+      phone_number TEXT,
+      address TEXT,
+      payment_method TEXT,
+      driver_id INTEGER,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      ticket_number INTEGER,
+      status TEXT DEFAULT 'open',
+      cash_received REAL DEFAULT NULL,
+      card_amount REAL DEFAULT NULL,
+      FOREIGN KEY (driver_id) REFERENCES drivers(id)
+    );
+  `);
 
   db.run(`
     CREATE TABLE IF NOT EXISTS drivers (
@@ -54,6 +51,26 @@ db.serialize(() => {
       name TEXT NOT NULL,
       phone TEXT
     );
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS store_settings (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      name TEXT,
+      address TEXT,
+      city TEXT,
+      state TEXT,
+      zip TEXT,
+      lat REAL,
+      lon REAL,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  db.run(`
+    INSERT INTO store_settings (id, name, address, city, state, zip, lat, lon)
+    VALUES (1, 'Main Store', '123 E Allegheny Ave', 'Philadelphia', 'PA', '19120', 39.9973, -75.1251)
+    ON CONFLICT(id) DO NOTHING;
   `);
 
   db.run(`

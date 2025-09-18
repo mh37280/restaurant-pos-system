@@ -1,18 +1,20 @@
-// backend/routes/geocodeRoutes.js
-const express = require('express');
+﻿const express = require('express');
+const db = require('../models/database');
+
 const router = express.Router();
 
-// If Node <18, uncomment next two lines:
-// const { fetch } = require('undici');
+const RESULT_CACHE_TTL_MS = 1000 * 60 * 10;
+const STORE_CACHE_TTL_MS = 1000 * 60 * 5;
+const MAX_RADIUS_MI = 6;
+const DEFAULT_STORE = { lat: 39.9973, lon: -75.1251 };
+const CONTACT_EMAIL = process.env.GEOCODE_CONTACT || 'support@example.com';
 
-const TTL_MS = 1000 * 60 * 10;
-const cache = new Map();
-const STORE = { lat: 39.9973, lon: -75.1251 }; // 123 E Allegheny approx
-const MAX_RADIUS_MI = 6; // hard cutoff — only keep results within 6 miles
+const resultCache = new Map();
+let storeCache = { data: null, ts: 0 };
 
 function haversineMiles(a, b) {
   const R = 3958.7613;
-  const toRad = d => (d * Math.PI) / 180;
+  const toRad = (d) => (d * Math.PI) / 180;
   const dLat = toRad(parseFloat(b.lat) - parseFloat(a.lat));
   const dLon = toRad(parseFloat(b.lon) - parseFloat(a.lon));
   const lat1 = toRad(parseFloat(a.lat));
@@ -23,27 +25,75 @@ function haversineMiles(a, b) {
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
-// small, local viewbox around the store (~4–5 miles box)
-const VIEWBOX = {
-  left:  -75.20, // lon min (west)
-  right: -75.05, // lon max (east)
-  top:    40.03, // lat max (north)
-  bottom: 39.97  // lat min (south)
-};
-// Nominatim wants: left,top,right,bottom (lon,lat,lon,lat) — note the order!
-const NOMINATIM_VIEWBOX = `${VIEWBOX.left},${VIEWBOX.top},${VIEWBOX.right},${VIEWBOX.bottom}`;
+function buildViewbox(store) {
+  const latDelta = 0.05; // ~3.5 miles north/south
+  const lonDelta = 0.07; // ~4 miles east/west at this latitude
+  const lat = Number(store.lat) || DEFAULT_STORE.lat;
+  const lon = Number(store.lon) || DEFAULT_STORE.lon;
+  return {
+    left: lon - lonDelta,
+    right: lon + lonDelta,
+    top: lat + latDelta,
+    bottom: lat - latDelta
+  };
+}
 
-// hardcoded config (you can change later)
-const CC = 'us'; // restrict to US
-// example: Philadelphia bounding box; adjust/remove if needed
-const BOUNDED = '1';
-const CONTACT = 'youremail@example.com'; // put your real email
+function toNominatimViewboxString(viewbox) {
+  return `${viewbox.left},${viewbox.top},${viewbox.right},${viewbox.bottom}`;
+}
 
-function setCache(q, data) { cache.set(q, { ts: Date.now(), data }); }
-function getCache(q) {
-  const hit = cache.get(q);
-  if (!hit || Date.now() - hit.ts > TTL_MS) { cache.delete(q); return null; }
+function getResultCache(key) {
+  const hit = resultCache.get(key);
+  if (!hit) return null;
+  if (Date.now() - hit.ts > RESULT_CACHE_TTL_MS) {
+    resultCache.delete(key);
+    return null;
+  }
   return hit.data;
+}
+
+function setResultCache(key, data) {
+  resultCache.set(key, { ts: Date.now(), data });
+}
+
+function loadStoreFromDb() {
+  return new Promise((resolve, reject) => {
+    db.get('SELECT * FROM store_settings WHERE id = 1', [], (err, row) => {
+      if (err) {
+        return reject(err);
+      }
+      if (!row) {
+        return resolve({ ...DEFAULT_STORE });
+      }
+      const lat = row.lat != null ? Number(row.lat) : null;
+      const lon = row.lon != null ? Number(row.lon) : null;
+      resolve({
+        lat: Number.isFinite(lat) ? lat : DEFAULT_STORE.lat,
+        lon: Number.isFinite(lon) ? lon : DEFAULT_STORE.lon,
+        address: row.address || '',
+        city: row.city || '',
+        state: row.state || '',
+        zip: row.zip || ''
+      });
+    });
+  });
+}
+
+async function getStoreLocation() {
+  if (storeCache.data && Date.now() - storeCache.ts < STORE_CACHE_TTL_MS) {
+    return storeCache.data;
+  }
+
+  try {
+    const store = await loadStoreFromDb();
+    storeCache = { data: store, ts: Date.now() };
+    return store;
+  } catch (err) {
+    console.warn('[GEOCODE] Failed to load store location from DB, using default', err.message);
+    const fallback = { ...DEFAULT_STORE };
+    storeCache = { data: fallback, ts: Date.now() };
+    return fallback;
+  }
 }
 
 function simplifyNominatim(item) {
@@ -87,27 +137,22 @@ function simplifyPhoton(item) {
   };
 }
 
-async function callNominatim(q) {
+async function callNominatim(q, store) {
+  const viewbox = buildViewbox(store);
   const url = new URL('https://nominatim.openstreetmap.org/search');
   url.searchParams.set('format', 'jsonv2');
   url.searchParams.set('addressdetails', '1');
-  url.searchParams.set('limit', '10');          // grab a few more then we’ll filter
+  url.searchParams.set('limit', '10');
   url.searchParams.set('countrycodes', 'us');
-
-  // Strict local bounding box around your store
-  url.searchParams.set('viewbox', NOMINATIM_VIEWBOX);
+  url.searchParams.set('viewbox', toNominatimViewboxString(viewbox));
   url.searchParams.set('bounded', '1');
-
-  // Bias near store (helps ranking inside the box)
-  url.searchParams.set('lat', String(STORE.lat));
-  url.searchParams.set('lon', String(STORE.lon));
-
-  // Plain query (no “US” suffix needed now)
+  url.searchParams.set('lat', String(store.lat));
+  url.searchParams.set('lon', String(store.lon));
   url.searchParams.set('q', q);
 
   const headers = {
-    'User-Agent': 'restaurant-pos-system/1.0 (contact: youremail@example.com)',
-    'Accept': 'application/json'
+    'User-Agent': `restaurant-pos-system/1.0 (contact: ${CONTACT_EMAIL})`,
+    Accept: 'application/json'
   };
 
   const resp = await fetch(url.toString(), { headers });
@@ -123,22 +168,23 @@ async function callNominatim(q) {
   }
 
   let data = [];
-  try { data = JSON.parse(text); } catch {}
+  try {
+    data = JSON.parse(text);
+  } catch (parseErr) {
+    console.warn('[GEOCODE] Nominatim parse error', parseErr.message);
+  }
   return Array.isArray(data) ? data.map(simplifyNominatim) : [];
 }
 
-
-async function callPhoton(q) {
+async function callPhoton(q, store) {
   const url = new URL('https://photon.komoot.io/api/');
   url.searchParams.set('q', q);
   url.searchParams.set('limit', '10');
-
-  // Bias to store location
-  url.searchParams.set('lat', String(STORE.lat));
-  url.searchParams.set('lon', String(STORE.lon));
+  url.searchParams.set('lat', String(store.lat));
+  url.searchParams.set('lon', String(store.lon));
 
   const headers = {
-    'User-Agent': 'restaurant-pos-system/1.0 (contact: youremail@example.com)'
+    'User-Agent': `restaurant-pos-system/1.0 (contact: ${CONTACT_EMAIL})`
   };
 
   const resp = await fetch(url.toString(), { headers });
@@ -154,59 +200,55 @@ async function callPhoton(q) {
   }
 
   let data = null;
-  try { data = JSON.parse(text); } catch {}
+  try {
+    data = JSON.parse(text);
+  } catch (parseErr) {
+    console.warn('[GEOCODE] Photon parse error', parseErr.message);
+  }
   const features = (data && data.features) || [];
   return features.map(simplifyPhoton);
 }
-
 
 router.get('/geocode', async (req, res) => {
   try {
     const q = (req.query.q || '').trim();
     if (!q) return res.json([]);
 
-    const cached = getCache(q);
+    const store = await getStoreLocation();
+    const cacheKey = `${q.toLowerCase()}::${store.lat}::${store.lon}`;
+
+    const cached = getResultCache(cacheKey);
     if (cached) return res.json(cached);
 
     let results = [];
     try {
-      results = await callNominatim(q);
-    } catch (e) {
-      console.warn('[GEOCODE] Nominatim failed, trying Photon:', e.status, e.info || e.message);
-      results = await callPhoton(q);
+      results = await callNominatim(q, store);
+    } catch (err) {
+      console.warn('[GEOCODE] Nominatim failed, falling back to Photon:', err.status, err.info || err.message);
+      results = await callPhoton(q, store);
     }
 
-    // === NEW: add distance, filter to local radius, sort by distance, cap to 6 ===
     let processed = results
-      .map(r => ({
+      .map((r) => ({
         ...r,
-        distance_mi: (r.lat && r.lon)
-          ? Number(haversineMiles(STORE, { lat: r.lat, lon: r.lon }).toFixed(2))
-          : null
+        distance_mi: r.lat && r.lon ? Number(haversineMiles(store, { lat: r.lat, lon: r.lon }).toFixed(2)) : null
       }))
-      // keep only valid, nearby results (drop Texas/etc)
-      .filter(r => r.distance_mi != null && (MAX_RADIUS_MI == null || r.distance_mi <= MAX_RADIUS_MI))
-      // nearest first
+      .filter((r) => r.distance_mi != null && (MAX_RADIUS_MI == null || r.distance_mi <= MAX_RADIUS_MI))
       .sort((a, b) => a.distance_mi - b.distance_mi)
-      // limit the payload
       .slice(0, 6);
 
-    // If nothing survived the strict filter, optionally fall back to the original (comment out to keep strict)
     if (processed.length === 0 && results.length > 0 && MAX_RADIUS_MI != null) {
-      // soft fallback: show the 6 closest even if slightly outside radius
       processed = results
-        .map(r => ({
+        .map((r) => ({
           ...r,
-          distance_mi: (r.lat && r.lon)
-            ? Number(haversineMiles(STORE, { lat: r.lat, lon: r.lon }).toFixed(2))
-            : null
+          distance_mi: r.lat && r.lon ? Number(haversineMiles(store, { lat: r.lat, lon: r.lon }).toFixed(2)) : null
         }))
-        .filter(r => r.distance_mi != null)
+        .filter((r) => r.distance_mi != null)
         .sort((a, b) => a.distance_mi - b.distance_mi)
         .slice(0, 6);
     }
 
-    setCache(q, processed);
+    setResultCache(cacheKey, processed);
     return res.json(processed);
   } catch (err) {
     console.error('geocode error', err);
