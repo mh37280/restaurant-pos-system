@@ -7,6 +7,7 @@ const orderRoutes = require('./routes/orderRoutes');
 const driverRoutes = require('./routes/driverRoutes');
 const modifierRoutes = require('./routes/modifierRoutes');
 const settlementsRoutes = require('./routes/settlements');
+const menuLayoutRoutes = require('./routes/menuLayoutRoutes');
 const storeRoutes = require('./routes/storeRoutes');
 const geocodeRoutes = require('./routes/geocodeRoutes');
 
@@ -22,6 +23,7 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/drivers', driverRoutes);
 app.use('/api/modifiers', modifierRoutes);
 app.use('/api/settlements', settlementsRoutes);
+app.use('/api/menu-layout', menuLayoutRoutes);
 app.use('/api/store', storeRoutes);
 app.use('/api', geocodeRoutes);
 

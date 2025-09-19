@@ -1,977 +1,1519 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import BackButton from "../components/BackButton";
 
-function BackOfficeMenu() {
-    const [menuItems, setMenuItems] = useState([]);
-    const [name, setName] = useState("");
-    const [price, setPrice] = useState("");
-    const [category, setCategory] = useState("");
-    const [categories, setCategories] = useState([]);
-    const [editingId, setEditingId] = useState(null);
-    const [search, setSearch] = useState("");
-    const [filterCategory, setFilterCategory] = useState("all");
-    const [showNewCategory, setShowNewCategory] = useState(false);
-    const [showAddModal, setShowAddModal] = useState(false);
-
-    // Modifier states
-    const [modifiers, setModifiers] = useState([]);
-    const [modifierOptions, setModifierOptions] = useState({});
-    const [showModifierModal, setShowModifierModal] = useState(false);
-    const [selectedMenuItem, setSelectedMenuItem] = useState(null);
-    const [showAddModifierModal, setShowAddModifierModal] = useState(false);
-    const [showAddOptionModal, setShowAddOptionModal] = useState(false);
-    const [selectedModifier, setSelectedModifier] = useState(null);
-    const [editingModifier, setEditingModifier] = useState(null);
-    const [editingOption, setEditingOption] = useState(null);
-
-    // Modal refs
-    const addModalRef = useRef(null);
-    const modifierModalRef = useRef(null);
-    const addModifierRef = useRef(null);
-    const addOptionRef = useRef(null);
-
-    // Close handlers
-    useOutsideClick(addModalRef, () => {
-        setShowAddModal(false);
-        setName("");
-        setPrice("");
-        setCategory("");
-        setShowNewCategory(false);
-    });
-
-    useOutsideClick(modifierModalRef, () => {
-        if (!showAddOptionModal && !showAddModifierModal) {
-            setShowModifierModal(false);
-            setSelectedMenuItem(null);
-            setEditingModifier(null);
-            setEditingOption(null);
-        }
-    });
-
-
-    useOutsideClick(addModifierRef, () => {
-        setShowAddModifierModal(false);
-    });
-
-    useOutsideClick(addOptionRef, () => {
-        setShowAddOptionModal(false);
-        setSelectedModifier(null);
-    });
-
-    useEffect(() => {
-        fetchMenu();
-        fetchModifiers();
-    }, []);
-    function useOutsideClick(ref, onClose) {
-        useEffect(() => {
-            function handleClickOutside(event) {
-                if (ref.current && !ref.current.contains(event.target)) {
-                    onClose();
-                }
-            }
-
-            document.addEventListener("mousedown", handleClickOutside);
-            return () => document.removeEventListener("mousedown", handleClickOutside);
-        }, [ref, onClose]);
-    }
-    const fetchMenu = async () => {
-        const res = await fetch("/api/menu");
-        const data = await res.json();
-        setMenuItems(data);
-        const uniqueCategories = [...new Set(data.map(item => item.category.toLowerCase()))];
-        setCategories(uniqueCategories);
-    };
-
-
-    const fetchModifiers = async () => {
-        const res = await fetch("/api/modifiers");
-        const data = await res.json();
-        setModifiers(data);
-
-        // Fetch options for each modifier
-        const optionsMap = {};
-        for (const modifier of data) {
-            const optRes = await fetch(`/api/modifiers/options/${modifier.id}`);
-            const optData = await optRes.json();
-            optionsMap[modifier.id] = optData;
-        }
-        setModifierOptions(optionsMap);
-    };
-
-    const handleAdd = async () => {
-        if (!name || !price || !category) return alert("All fields required");
-
-        const res = await fetch("/api/menu", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name, price: parseFloat(price), category })
-        });
-
-        if (res.ok) {
-            setName("");
-            setPrice("");
-            setCategory("");
-            setShowAddModal(false);
-            fetchMenu();
-        } else {
-            alert("Failed to add item");
-        }
-    };
-
-    const handleRemove = async (id) => {
-        const confirmed = window.confirm("Remove this item? This will also delete all its modifiers.");
-        if (!confirmed) return;
-
-        const res = await fetch(`/api/menu/${id}`, { method: "DELETE" });
-        if (res.ok) {
-            fetchMenu();
-            fetchModifiers();
-        } else {
-            alert("Failed to delete item");
-        }
-    };
-
-    const handleEdit = async (id, updatedItem) => {
-        const res = await fetch(`/api/menu/${id}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(updatedItem)
-        });
-        if (res.ok) {
-            fetchMenu();
-            setEditingId(null);
-        } else alert("Failed to update item");
-    };
-
-    const handleAvailabilityChange = async (id, newStatus) => {
-        try {
-            const res = await fetch(`/api/menu/${id}/availability`, {
-                method: "PUT",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({ available: newStatus })
-            });
-
-            if (!res.ok) throw new Error("Failed to update availability");
-
-            // Update local state
-            setMenuItems((prevMenu) =>
-                prevMenu.map((item) =>
-                    item.id === id ? { ...item, available: newStatus ? 1 : 0 } : item
-                )
-            );
-        } catch (err) {
-            console.error(err);
-            alert("Could not update availability.");
-        }
-    };
-
-
-
-    // Modifier functions
-    const handleAddModifier = async (modifierData) => {
-        const res = await fetch("http://localhost:3001/api/modifiers", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                ...modifierData,
-                menu_id: selectedMenuItem.id
-            })
-        });
-
-        if (res.ok) {
-            fetchModifiers();
-            setShowAddModifierModal(false);
-        } else {
-            alert("Failed to add modifier");
-        }
-    };
-
-    const handleUpdateModifier = async (id, modifierData) => {
-        const res = await fetch(`http://localhost:3001/api/modifiers/${id}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(modifierData)
-        });
-
-        if (res.ok) {
-            fetchModifiers();
-            setEditingModifier(null);
-        } else {
-            alert("Failed to update modifier");
-        }
-    };
-
-    const handleDeleteModifier = async (id) => {
-        const confirmed = window.confirm("Delete this modifier and all its options?");
-        if (!confirmed) return;
-
-        const res = await fetch(`http://localhost:3001/api/modifiers/${id}`, { method: "DELETE" });
-        if (res.ok) {
-            fetchModifiers();
-        } else {
-            alert("Failed to delete modifier");
-        }
-    };
-
-    const handleAddOption = async (optionData) => {
-        try {
-            const res = await fetch("http://localhost:3001/api/modifiers/options", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    ...optionData,
-                    modifier_id: selectedModifier.id
-                })
-            });
-
-            if (res.ok) {
-                fetchModifiers();
-                setShowAddOptionModal(false);
-            } else {
-                const errorText = await res.text();
-                console.error("Error response:", errorText);
-                alert(`Failed to add option: ${res.status} - ${errorText}`);
-            }
-        } catch (error) {
-            console.error("Network error:", error);
-            alert(`Network error: ${error.message}`);
-        }
-    };
-
-    const handleUpdateOption = async (id, optionData) => {
-        const res = await fetch(`http://localhost:3001/api/modifiers/options/${id}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(optionData)
-        });
-
-        if (res.ok) {
-            fetchModifiers();
-            setEditingOption(null);
-        } else {
-            alert("Failed to update option");
-        }
-    };
-
-    const handleDeleteOption = async (id) => {
-        const confirmed = window.confirm("Delete this option?");
-        if (!confirmed) return;
-
-        const res = await fetch(`http://localhost:3001/api/modifiers/options/${id}`, { method: "DELETE" });
-        if (res.ok) {
-            fetchModifiers();
-        } else {
-            alert("Failed to delete option");
-        }
-    };
-
-    const openModifierModal = (menuItem) => {
-        setSelectedMenuItem(menuItem);
-        setShowModifierModal(true);
-    };
-
-    const getModifiersForItem = (menuId) => {
-        return modifiers.filter(modifier => modifier.menu_id === menuId);
-    };
-
-    const groupModifiersByCategory = (itemModifiers) => {
-        const grouped = {};
-        itemModifiers.forEach(modifier => {
-            const category = modifier.name.toLowerCase().includes('size') ? 'Size' :
-                modifier.name.toLowerCase().includes('topping') ? 'Toppings' :
-                    modifier.name.toLowerCase().includes('sauce') ? 'Sauces' :
-                        modifier.name.toLowerCase().includes('side') ? 'Sides' :
-                            'Other';
-
-            if (!grouped[category]) grouped[category] = [];
-            grouped[category].push(modifier);
-        });
-        return grouped;
-    };
-
-    const filteredItems = menuItems.filter(item => {
-        const matchesCategory = filterCategory === "all" || item.category.toLowerCase() === filterCategory;
-        const matchesSearch = item.name.toLowerCase().includes(search.toLowerCase());
-        return matchesCategory && matchesSearch;
-    });
-
-    return (
-        <div style={{ padding: "30px", fontFamily: "Arial" }}>
-            <h1 style={{ marginBottom: "20px" }}>Menu Management</h1>
-            <BackButton />
-
-            {/* Filters and Search */}
-            <div style={{ display: "flex", marginBottom: "20px", gap: "10px" }}>
-                <select
-                    value={filterCategory}
-                    onChange={(e) => setFilterCategory(e.target.value)}
-                    style={{ padding: "10px" }}
-                >
-                    <option value="all">All Categories</option>
-                    {categories.map(cat => (
-                        <option key={cat} value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</option>
-                    ))}
-                </select>
-
-                <input
-                    type="text"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search items"
-                    style={{ padding: "10px", flex: 1, maxWidth: "300px" }}
-                />
-            </div>
-
-            <button onClick={() => setShowAddModal(true)} style={{ ...addBtn, marginBottom: "20px" }}>
-                + Add Item
-            </button>
-
-            {/* Menu Items Table */}
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead>
-                    <tr>
-                        <th style={th}>Name</th>
-                        <th style={th}>Price</th>
-                        <th style={th}>Category</th>
-                        <th style={th}>Modifiers</th>
-                        <th style={th}>Actions</th>
-                        <th style={th}>Availability</th>
-
-                    </tr>
-                </thead>
-                <tbody>
-                    {filteredItems.map(item => {
-                        const itemModifiers = getModifiersForItem(item.id);
-                        return (
-                            <tr key={item.id}>
-                                <td style={{ ...td, maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                    {editingId === item.id ? (
-                                        <input
-                                            value={item.name}
-                                            onChange={(e) => setMenuItems(prev => prev.map(m => m.id === item.id ? { ...m, name: e.target.value } : m))}
-                                        />
-                                    ) : item.name}
-                                </td>
-                                <td style={td}>
-                                    {editingId === item.id ? (
-                                        <input
-                                            value={item.price}
-                                            type="number"
-                                            onChange={(e) => setMenuItems(prev => prev.map(m => m.id === item.id ? { ...m, price: e.target.value } : m))}
-                                        />
-                                    ) : `$${parseFloat(item.price).toFixed(2)}`}
-                                </td>
-                                <td style={td}>
-                                    {editingId === item.id ? (
-                                        <>
-                                            {!item._showNewCategory ? (
-                                                <select
-                                                    value={item.category}
-                                                    onChange={(e) => {
-                                                        const val = e.target.value;
-                                                        if (val === "__new__") {
-                                                            setMenuItems(prev =>
-                                                                prev.map(m =>
-                                                                    m.id === item.id
-                                                                        ? { ...m, _showNewCategory: true, category: "" }
-                                                                        : m
-                                                                )
-                                                            );
-                                                        } else {
-                                                            setMenuItems(prev =>
-                                                                prev.map(m =>
-                                                                    m.id === item.id ? { ...m, category: val } : m
-                                                                )
-                                                            );
-                                                        }
-                                                    }}
-                                                >
-                                                    <option value="">Select category</option>
-                                                    {categories.map((cat) => (
-                                                        <option key={cat} value={cat}>
-                                                            {cat.charAt(0).toUpperCase() + cat.slice(1)}
-                                                        </option>
-                                                    ))}
-                                                    <option value="__new__">+ Add new category</option>
-                                                </select>
-                                            ) : (
-                                                <input
-                                                    placeholder="New category name"
-                                                    value={item.category}
-                                                    onChange={(e) =>
-                                                        setMenuItems(prev =>
-                                                            prev.map(m =>
-                                                                m.id === item.id
-                                                                    ? { ...m, category: e.target.value }
-                                                                    : m
-                                                            )
-                                                        )
-                                                    }
-                                                    onBlur={() => {
-                                                        if (!item.category) {
-                                                            setMenuItems(prev =>
-                                                                prev.map(m =>
-                                                                    m.id === item.id
-                                                                        ? { ...m, _showNewCategory: false }
-                                                                        : m
-                                                                )
-                                                            );
-                                                        }
-                                                    }}
-                                                />
-                                            )}
-                                        </>
-                                    ) : (
-                                        item.category.charAt(0).toUpperCase() + item.category.slice(1)
-                                    )}
-                                </td>
-                                <td style={td}>
-                                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                                        <span style={{ fontSize: "14px", color: "#666" }}>
-                                            {itemModifiers.length} modifier{itemModifiers.length !== 1 ? 's' : ''}
-                                        </span>
-                                        <button
-                                            onClick={() => openModifierModal(item)}
-                                            style={{ ...btn, fontSize: "12px", padding: "4px 8px" }}
-                                        >
-                                            Manage
-                                        </button>
-                                    </div>
-                                </td>
-                                <td style={td}>
-
-                                    {/* Edit / Remove Buttons */}
-                                    {editingId === item.id ? (
-                                        <>
-                                            <button onClick={() => handleEdit(item.id, item)} style={btn}>Save</button>
-                                            <button onClick={() => setEditingId(null)} style={{ ...btn, backgroundColor: "gray", marginLeft: "5px" }}>Cancel</button>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <button onClick={() => setEditingId(item.id)} style={btn}>Edit</button>
-                                            <button onClick={() => handleRemove(item.id)} style={{ ...btn, backgroundColor: "red", marginLeft: "5px" }}>Remove</button>
-                                        </>
-                                    )}
-                                </td>
-                                <td style={{ ...td, width: "120px", textAlign: "left" }}>
-                                    <label style={{ display: "inline-flex", alignItems: "center", cursor: "pointer" }}>
-                                        <input
-                                            type="checkbox"
-                                            checked={item.available === 1}
-                                            onChange={() => handleAvailabilityChange(item.id, !item.available)}
-                                            style={{
-                                                appearance: "none",
-                                                width: "18px",
-                                                height: "18px",
-                                                border: "2px solid #28a745",
-                                                borderRadius: "4px",
-                                                backgroundColor: item.available ? "#28a745" : "#fff",
-                                                display: "inline-block",
-                                                marginRight: "6px",
-                                                transition: "all 0.2s"
-                                            }}
-                                        />
-                                        <span style={{ color: item.available ? "#28a745" : "#999", fontWeight: 500 }}>
-                                            {item.available ? "Available" : "Unavailable"}
-                                        </span>
-                                    </label>
-                                </td>
-
-
-                            </tr>
-                        );
-                    })}
-                </tbody>
-            </table>
-
-            {filteredItems.length === 0 && (
-                <p style={{ marginTop: "20px", fontStyle: "italic" }}>No items found.</p>
-            )}
-
-            {/* Add Menu Item Modal */}
-            {showAddModal && (
-                <div style={modalOverlay}>
-                    <div ref={addModalRef} style={{ ...modalContent, position: "relative" }}>
-                        <button
-                            onClick={() => {
-                                setShowAddModal(false);
-                                setName("");
-                                setPrice("");
-                                setCategory("");
-                                setShowNewCategory(false);
-                            }}
-                            style={closeBtn}
-                        >×</button>
-
-                        <h2 style={{ marginBottom: 16 }}>Add New Menu Item</h2>
-                        <input value={name} onChange={e => setName(e.target.value)} placeholder="Item name" style={inputStyle} />
-                        <input value={price} onChange={e => setPrice(e.target.value)} placeholder="Price" type="number" step="0.01" style={inputStyle} />
-                        {!showNewCategory ? (
-                            <select
-                                value={category}
-                                onChange={(e) => {
-                                    if (e.target.value === "__new__") {
-                                        setShowNewCategory(true);
-                                        setCategory("");
-                                    } else {
-                                        setCategory(e.target.value);
-                                    }
-                                }}
-                                style={inputStyle}
-                            >
-                                <option value="">Select category</option>
-                                {categories.map((cat) => (
-                                    <option key={cat} value={cat}>
-                                        {cat.charAt(0).toUpperCase() + cat.slice(1)}
-                                    </option>
-                                ))}
-                                <option value="__new__">+ Add new category</option>
-                            </select>
-                        ) : (
-                            <input
-                                placeholder="New category name"
-                                value={category}
-                                onChange={(e) => setCategory(e.target.value)}
-                                onBlur={() => {
-                                    if (!category) setShowNewCategory(false);
-                                }}
-                                style={inputStyle}
-                            />
-                        )}
-                        <div style={{ display: "flex", gap: "10px", marginTop: "16px" }}>
-                            <button onClick={handleAdd} style={btn}>Add</button>
-                            <button onClick={() => {
-                                setShowAddModal(false);
-                                setName("");
-                                setPrice("");
-                                setCategory("");
-                                setShowNewCategory(false);
-                            }} style={{ ...btn, backgroundColor: "gray" }}>Cancel</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Modifier Management Modal */}
-            {showModifierModal && selectedMenuItem && (
-                <div style={modalOverlay}>
-                    <div ref={modifierModalRef} style={{ ...modalContent, minWidth: "600px", maxHeight: "80vh", overflow: "auto", position: "relative" }}>
-                        <h2 style={{ marginBottom: 16 }}>Manage Modifiers for "{selectedMenuItem.name}"</h2>
-                        <button
-                            onClick={() => {
-                                setShowModifierModal(false);
-                                setName("");
-                                setPrice("");
-                                setCategory("");
-                                setShowNewCategory(false);
-                            }}
-                            style={closeBtn}
-                        >×</button>
-                        <button
-                            onClick={() => setShowAddModifierModal(true)}
-                            style={{ ...btn, marginBottom: "20px" }}
-                        >
-                            + Add Modifier
-                        </button>
-
-                        {(() => {
-                            const itemModifiers = getModifiersForItem(selectedMenuItem.id);
-                            const groupedModifiers = groupModifiersByCategory(itemModifiers);
-
-                            return Object.keys(groupedModifiers).length > 0 ?
-                                Object.entries(groupedModifiers).map(([category, categoryModifiers]) => (
-                                    <div key={category} style={{ marginBottom: "30px" }}>
-                                        <h3 style={{ color: "#333", borderBottom: "2px solid #007bff", paddingBottom: "5px" }}>
-                                            {category}
-                                        </h3>
-                                        {categoryModifiers.map(modifier => (
-                                            <div key={modifier.id} style={modifierCard}>
-                                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-                                                    {editingModifier === modifier.id ? (
-                                                        <div style={{ flex: 1, display: "flex", gap: "10px", alignItems: "center" }}>
-                                                            <input
-                                                                defaultValue={modifier.name}
-                                                                placeholder="Modifier name"
-                                                                style={inputStyle}
-                                                                id={`edit-modifier-name-${modifier.id}`}
-                                                            />
-                                                            <label style={{ fontSize: "12px" }}>
-                                                                <input
-                                                                    type="checkbox"
-                                                                    defaultChecked={modifier.is_required}
-                                                                    id={`edit-modifier-required-${modifier.id}`}
-                                                                /> Required
-                                                            </label>
-                                                            <label style={{ fontSize: "12px" }}>
-                                                                <input
-                                                                    type="checkbox"
-                                                                    defaultChecked={modifier.is_multiple}
-                                                                    id={`edit-modifier-multiple-${modifier.id}`}
-                                                                /> Multiple
-                                                            </label>
-                                                        </div>
-                                                    ) : (
-                                                        <div>
-                                                            <h4 style={{ margin: 0 }}>{modifier.name}</h4>
-                                                            <div style={{ fontSize: "12px", color: "#666" }}>
-                                                                {modifier.is_required ? "Required" : "Optional"} • {modifier.is_multiple ? "Multiple selection" : "Single selection"}
-                                                            </div>
-                                                        </div>
-                                                    )}
-
-                                                    <div style={{ display: "flex", gap: "5px" }}>
-                                                        {editingModifier === modifier.id ? (
-                                                            <>
-                                                                <button
-                                                                    onClick={() => {
-                                                                        const name = document.getElementById(`edit-modifier-name-${modifier.id}`).value;
-                                                                        const is_required = document.getElementById(`edit-modifier-required-${modifier.id}`).checked;
-                                                                        const is_multiple = document.getElementById(`edit-modifier-multiple-${modifier.id}`).checked;
-                                                                        handleUpdateModifier(modifier.id, { name, is_required, is_multiple });
-                                                                    }}
-                                                                    style={{ ...btn, fontSize: "12px", padding: "4px 8px" }}
-                                                                >
-                                                                    Save
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => setEditingModifier(null)}
-                                                                    style={{ ...btn, backgroundColor: "gray", fontSize: "12px", padding: "4px 8px" }}
-                                                                >
-                                                                    Cancel
-                                                                </button>
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <button
-                                                                    onClick={() => setEditingModifier(modifier.id)}
-                                                                    style={{ ...btn, fontSize: "12px", padding: "4px 8px" }}
-                                                                >
-                                                                    Edit
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => {
-                                                                        setSelectedModifier(modifier);
-                                                                        setShowAddOptionModal(true);
-                                                                    }}
-                                                                    style={{ ...btn, backgroundColor: "#28a745", fontSize: "12px", padding: "4px 8px" }}
-                                                                >
-                                                                    + Option
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => handleDeleteModifier(modifier.id)}
-                                                                    style={{ ...btn, backgroundColor: "red", fontSize: "12px", padding: "4px 8px" }}
-                                                                >
-                                                                    Delete
-                                                                </button>
-                                                            </>
-                                                        )}
-                                                    </div>
-                                                </div>
-
-                                                <div style={{ marginLeft: "20px" }}>
-                                                    <h5 style={{ margin: "5px 0", color: "#666" }}>Options:</h5>
-                                                    {modifierOptions[modifier.id] && modifierOptions[modifier.id].length > 0 ? (
-                                                        modifierOptions[modifier.id].map(option => (
-                                                            <div key={option.id} style={optionCard}>
-                                                                {editingOption === option.id ? (
-                                                                    <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                                                                        <input
-                                                                            defaultValue={option.label}
-                                                                            placeholder="Option label"
-                                                                            style={{ ...inputStyle, flex: 1 }}
-                                                                            id={`edit-option-label-${option.id}`}
-                                                                        />
-                                                                        <input
-                                                                            defaultValue={option.price_delta}
-                                                                            placeholder="Price change"
-                                                                            type="number"
-                                                                            step="0.01"
-                                                                            style={{ ...inputStyle, width: "80px" }}
-                                                                            id={`edit-option-price-${option.id}`}
-                                                                        />
-                                                                        <button
-                                                                            onClick={() => {
-                                                                                const label = document.getElementById(`edit-option-label-${option.id}`).value;
-                                                                                const price_delta = parseFloat(document.getElementById(`edit-option-price-${option.id}`).value) || 0;
-                                                                                handleUpdateOption(option.id, { label, price_delta });
-                                                                            }}
-                                                                            style={{ ...btn, fontSize: "12px", padding: "2px 6px" }}
-                                                                        >
-                                                                            Save
-                                                                        </button>
-                                                                        <button
-                                                                            onClick={() => setEditingOption(null)}
-                                                                            style={{ ...btn, backgroundColor: "gray", fontSize: "12px", padding: "2px 6px" }}
-                                                                        >
-                                                                            Cancel
-                                                                        </button>
-                                                                    </div>
-                                                                ) : (
-                                                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                                                        <span>
-                                                                            {option.label}
-                                                                            {option.price_delta !== 0 && (
-                                                                                <span style={{ color: option.price_delta > 0 ? "#28a745" : "#dc3545" }}>
-                                                                                    ({option.price_delta > 0 ? '+' : ''}${option.price_delta.toFixed(2)})
-                                                                                </span>
-                                                                            )}
-                                                                        </span>
-                                                                        <div>
-                                                                            <button
-                                                                                onClick={() => setEditingOption(option.id)}
-                                                                                style={{ ...btn, fontSize: "10px", padding: "2px 6px", marginRight: "5px" }}
-                                                                            >
-                                                                                Edit
-                                                                            </button>
-                                                                            <button
-                                                                                onClick={() => handleDeleteOption(option.id)}
-                                                                                style={{ ...btn, backgroundColor: "red", fontSize: "10px", padding: "2px 6px" }}
-                                                                            >
-                                                                                Delete
-                                                                            </button>
-                                                                        </div>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        ))
-                                                    ) : (
-                                                        <p style={{ fontSize: "12px", color: "#999", fontStyle: "italic" }}>No options added yet</p>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )) : (
-                                    <p style={{ textAlign: "center", color: "#666", fontStyle: "italic" }}>
-                                        No modifiers added yet. Click "Add Modifier" to get started.
-                                    </p>
-                                )
-                        })()}
-
-                        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "20px", borderTop: "1px solid #eee", paddingTop: "20px" }}>
-                            <button
-                                onClick={() => {
-                                    setShowModifierModal(false);
-                                    setSelectedMenuItem(null);
-                                    setEditingModifier(null);
-                                    setEditingOption(null);
-                                }}
-                                style={{ ...btn, backgroundColor: "gray" }}
-                            >
-                                Close
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )
-            }
-
-            {/* Add Modifier Modal */}
-            {showAddModifierModal && (
-                <div style={modalOverlay}>
-                    <div ref={addModifierRef} style={{ ...modalContent, position: "relative" }}>
-                        <button
-                            onClick={() => {
-                                setShowAddModifierModal(false);
-                                setName("");
-                                setPrice("");
-                                setCategory("");
-                                setShowNewCategory(false);
-                            }}
-                            style={closeBtn}
-                        >×</button>
-                        <h3>Add New Modifier</h3>
-                        <input id="new-modifier-name" placeholder="Modifier name (e.g., Size, Toppings)" style={inputStyle} />
-                        <label style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "14px" }}>
-                            <input type="checkbox" id="new-modifier-required" />
-                            Required modifier
-                        </label>
-                        <label style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "14px" }}>
-                            <input type="checkbox" id="new-modifier-multiple" />
-                            Allow multiple selections
-                        </label>
-                        <div style={{ display: "flex", gap: "10px", marginTop: "16px" }}>
-                            <button
-                                onClick={() => {
-                                    const name = document.getElementById('new-modifier-name').value;
-                                    const is_required = document.getElementById('new-modifier-required').checked;
-                                    const is_multiple = document.getElementById('new-modifier-multiple').checked;
-
-                                    if (!name.trim()) {
-                                        alert('Please enter a modifier name');
-                                        return;
-                                    }
-
-                                    handleAddModifier({ name, is_required, is_multiple });
-                                }}
-                                style={btn}
-                            >
-                                Add Modifier
-                            </button>
-                            <button
-                                onClick={() => setShowAddModifierModal(false)}
-                                style={{ ...btn, backgroundColor: "gray" }}
-                            >
-                                Cancel
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )
-            }
-
-            {/* Add Option Modal */}
-            {showAddOptionModal && selectedModifier && (
-                <div style={modalOverlay}>
-                    <div ref={addOptionRef} style={{ ...modalContent, position: "relative" }}>
-                        <button
-                            onClick={() => {
-                                setShowAddOptionModal(false);
-                                setName("");
-                                setPrice("");
-                                setCategory("");
-                                setShowNewCategory(false);
-                            }}
-                            style={closeBtn}
-                        >×</button>
-                        <h3>Add Option to "{selectedModifier.name}"</h3>
-                        <input id="new-option-label" placeholder="Option name (e.g., Large, Extra Cheese)" style={inputStyle} />
-                        <input
-                            id="new-option-price"
-                            placeholder="Price change (0 for no change)"
-                            type="number"
-                            step="0.01"
-                            style={inputStyle}
-                        />
-                        <div style={{ display: "flex", gap: "10px", marginTop: "16px" }}>
-                            <button
-                                onClick={() => {
-                                    const label = document.getElementById('new-option-label').value;
-                                    const price_delta = parseFloat(document.getElementById('new-option-price').value) || 0;
-
-                                    if (!label.trim()) {
-                                        alert('Please enter an option name');
-                                        return;
-                                    }
-
-                                    handleAddOption({ label, price_delta });
-                                }}
-                                style={btn}
-                            >
-                                Add Option
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setShowAddOptionModal(false);
-                                    setSelectedModifier(null);
-                                }}
-                                style={{ ...btn, backgroundColor: "gray" }}
-                            >
-                                Cancel
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )
-            }
-        </div>
-    );
-}
-
-const btn = {
-    padding: "6px 12px",
-    fontSize: "14px",
-    backgroundColor: "#007bff",
-    color: "#fff",
+const layoutStyles = {
+  page: { padding: "30px", fontFamily: "Arial, sans-serif" },
+  tabRow: { display: "flex", gap: 12, marginTop: 18 },
+  tab: {
+    padding: "10px 18px",
+    borderRadius: 999,
     border: "none",
-    borderRadius: "4px",
-    cursor: "pointer"
-};
-
-const addBtn = {
-    padding: "12px 24px",
-    fontSize: "18px",
-    fontWeight: "bold",
-    backgroundColor: "#007bff",
-    color: "#fff",
-    border: "none",
-    borderRadius: "8px",
+    backgroundColor: "#e5e7eb",
+    color: "#1f2937",
     cursor: "pointer",
-    boxShadow: "0 4px 12px rgba(0, 123, 255, 0.3)",
-    transition: "transform 0.2s ease, box-shadow 0.2s ease"
-};
-
-const th = {
-    borderBottom: "2px solid #ccc",
-    padding: "10px",
-    textAlign: "left"
-};
-
-const td = {
-    borderBottom: "1px solid #eee",
-    padding: "10px",
-    verticalAlign: "top"
-};
-
-const modalOverlay = {
-    position: "fixed",
-    top: 0,
-    left: 0,
-    width: "100vw",
-    height: "100vh",
-    backgroundColor: "rgba(0,0,0,0.5)",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 999
-};
-
-const modalContent = {
+    fontWeight: 600,
+    fontSize: 14
+  },
+  tabActive: {
+    padding: "10px 18px",
+    borderRadius: 999,
+    border: "none",
+    backgroundColor: "#2563eb",
+    color: "#fff",
+    cursor: "pointer",
+    fontWeight: 600,
+    fontSize: 14
+  },
+  primaryButton: {
+    padding: "10px 16px",
+    borderRadius: 8,
+    border: "none",
+    backgroundColor: "#2563eb",
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: "pointer"
+  },
+  secondaryButton: {
+    padding: "10px 16px",
+    borderRadius: 8,
+    border: "1px solid #d1d5db",
     backgroundColor: "#fff",
-    padding: "24px",
-    borderRadius: "8px",
-    boxShadow: "0 0 12px rgba(0,0,0,0.3)",
+    color: "#1f2937",
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: "pointer"
+  },
+  card: {
+    backgroundColor: "#ffffff",
+    borderRadius: 12,
+    boxShadow: "0 10px 30px rgba(15, 23, 42, 0.08)",
+    padding: 20,
     display: "flex",
     flexDirection: "column",
-    gap: "10px",
-    minWidth: "300px"
+    gap: 16
+  },
+  input: {
+    padding: "10px 12px",
+    border: "1px solid #d1d5db",
+    borderRadius: 8,
+    fontSize: 14
+  }
 };
 
-const inputStyle = {
-    padding: "10px",
-    border: "1px solid #ddd",
-    borderRadius: "4px",
-    fontSize: "14px"
+const emptyItemDraft = {
+  id: null,
+  name: "",
+  price: "",
+  categoryId: null,
+  buttonLabel: "",
+  buttonColor: "",
+  sortOrder: 0,
+  isVisible: true
 };
 
-const modifierCard = {
-    backgroundColor: "#f8f9fa",
-    padding: "15px",
-    borderRadius: "6px",
-    marginBottom: "15px",
-    border: "1px solid #e9ecef"
-};
+function toCellKey(rowIndex, colIndex) {
+  return String(rowIndex) + "-" + String(colIndex);
+}
 
-const optionCard = {
-    backgroundColor: "#fff",
-    padding: "8px 12px",
-    borderRadius: "4px",
-    marginBottom: "5px",
-    border: "1px solid #dee2e6",
-    fontSize: "13px"
-};
-const closeBtn = {
-    position: "absolute",
-    top: 8,
-    right: 12,
-    fontSize: "24px",
-    background: "none",
-    border: "none",
-    cursor: "pointer",
-    color: "#999"
-};
+function parseCellKey(key) {
+  const parts = key.split("-");
+  return {
+    row: parseInt(parts[0], 10),
+    col: parseInt(parts[1], 10)
+  };
+}
 
+async function fetchJson(url, options) {
+  const res = await fetch(url, options);
+  if (!res.ok) {
+    let message = res.statusText || "Request failed";
+    try {
+      const text = await res.text();
+      if (text) message = text;
+    } catch (err) {
+      // ignore
+    }
+    throw new Error(message);
+  }
+  return res.json();
+}
+
+function MessageBanner({ type, text, onClose }) {
+  if (!text) return null;
+  const background = type === "error" ? "#fee2e2" : "#dcfce7";
+  const border = type === "error" ? "#fca5a5" : "#86efac";
+  const color = type === "error" ? "#b91c1c" : "#15803d";
+  return (
+    <div
+      style={{
+        background,
+        border: "1px solid " + border,
+        color,
+        padding: "12px 16px",
+        borderRadius: 8,
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginTop: 16
+      }}
+    >
+      <span>{text}</span>
+      <button
+        type="button"
+        onClick={onClose}
+        style={{ background: "none", border: "none", color, fontSize: 18, cursor: "pointer" }}
+      >
+        x
+      </button>
+    </div>
+  );
+}
+
+function BackOfficeMenu() {
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState(null);
+  const [error, setError] = useState(null);
+  const [view, setView] = useState("layout");
+
+  const [categories, setCategories] = useState([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState(null);
+  const [panels, setPanels] = useState([]);
+  const [selectedPanelId, setSelectedPanelId] = useState(null);
+  const [slots, setSlots] = useState([]);
+  const [draftSlots, setDraftSlots] = useState({});
+  const [draftDirty, setDraftDirty] = useState(false);
+  const [selectedCellKey, setSelectedCellKey] = useState(null);
+  const [savingLayout, setSavingLayout] = useState(false);
+
+  const [items, setItems] = useState([]);
+  const [itemForm, setItemForm] = useState(null);
+
+  const [modifiers, setModifiers] = useState([]);
+  const [modifierOptions, setModifierOptions] = useState({});
+  const [modifierContext, setModifierContext] = useState(null);
+
+  async function loadItems() {
+    const data = await fetchJson("/api/menu");
+    const normalized = data.map((item) => ({
+      id: item.id,
+      name: item.name,
+      price: Number(item.price || 0),
+      categoryId: item.category_id != null ? item.category_id : item.categoryId ?? null,
+      panelId: item.panel_id != null ? item.panel_id : item.panelId ?? null,
+      layoutSlotId: item.layout_slot_id != null ? item.layout_slot_id : item.layoutSlotId ?? null,
+      buttonLabel: item.button_label ?? item.buttonLabel ?? "",
+      buttonColor: item.button_color ?? item.buttonColor ?? "",
+      sortOrder: item.sort_order ?? item.sortOrder ?? 0,
+      isVisible: item.is_visible === 0 ? false : item.is_visible === false ? false : true
+    }));
+    setItems(normalized);
+    return normalized;
+  }
+  async function loadCategories(focusId) {
+    const data = await fetchJson("/api/menu-layout/categories");
+    const normalized = data.map((cat) => ({
+      id: cat.id,
+      name: cat.name,
+      color: cat.color || "",
+      icon: cat.icon || "",
+      position: cat.position || "left",
+      sortOrder: cat.sort_order ?? cat.sortOrder ?? 0
+    }));
+    setCategories(normalized);
+    let nextId = focusId != null ? focusId : selectedCategoryId;
+    if (!nextId || !normalized.some((cat) => cat.id === nextId)) {
+      nextId = normalized.length > 0 ? normalized[0].id : null;
+    }
+    setSelectedCategoryId(nextId);
+    return normalized;
+  }
+  async function loadPanels(categoryId, focusPanelId) {
+    if (!categoryId) {
+      setPanels([]);
+      setSelectedPanelId(null);
+      setSlots([]);
+      return [];
+    }
+    const data = await fetchJson("/api/menu-layout/categories/" + categoryId + "/panels");
+    const normalized = data.map((panel) => ({
+      id: panel.id,
+      categoryId: panel.category_id != null ? panel.category_id : panel.categoryId,
+      name: panel.name,
+      icon: panel.icon || "",
+      color: panel.color || "",
+      sortOrder: panel.sort_order ?? panel.sortOrder ?? 0,
+      gridRows: panel.grid_rows ?? panel.gridRows ?? 4,
+      gridCols: panel.grid_cols ?? panel.gridCols ?? 5,
+      isActive: panel.is_active === undefined ? true : panel.is_active === 1 || panel.is_active === true
+    }));
+    setPanels(normalized);
+    let nextId = focusPanelId != null ? focusPanelId : selectedPanelId;
+    if (!nextId || !normalized.some((panel) => panel.id === nextId)) {
+      nextId = normalized.length > 0 ? normalized[0].id : null;
+    }
+    setSelectedPanelId(nextId);
+    return normalized;
+  }
+  async function loadSlots(panelId) {
+    if (!panelId) {
+      setSlots([]);
+      return [];
+    }
+    const data = await fetchJson("/api/menu-layout/panels/" + panelId + "/slots");
+    const normalized = data.map((slot) => ({
+      id: slot.id,
+      rowIndex: slot.row_index ?? slot.rowIndex ?? 0,
+      colIndex: slot.col_index ?? slot.colIndex ?? 0,
+      rowSpan: slot.row_span ?? slot.rowSpan ?? 1,
+      colSpan: slot.col_span ?? slot.colSpan ?? 1,
+      itemId: slot.item_id ?? slot.itemId ?? null,
+      labelOverride: slot.label_override ?? slot.labelOverride ?? "",
+      sortOrder: slot.sort_order ?? slot.sortOrder ?? 0
+    }));
+    setSlots(normalized);
+    return normalized;
+  }
+  async function loadModifiers() {
+    const modList = await fetchJson("/api/modifiers");
+    setModifiers(modList);
+    const optionsMap = {};
+    for (const mod of modList) {
+      try {
+        optionsMap[mod.id] = await fetchJson("/api/modifiers/options/" + mod.id);
+      } catch (err) {
+        optionsMap[mod.id] = [];
+      }
+    }
+    setModifierOptions(optionsMap);
+  }
+  useEffect(() => {
+    async function bootstrap() {
+      try {
+        await Promise.all([loadItems(), loadCategories()]);
+        await loadModifiers();
+      } catch (err) {
+        console.error(err);
+        setError(err.message || "Failed to load menu data");
+      } finally {
+        setLoading(false);
+      }
+    }
+    bootstrap();
+  }, []);
+
+  useEffect(() => {
+    if (selectedCategoryId == null) {
+      setPanels([]);
+      setSelectedPanelId(null);
+      setSlots([]);
+      return;
+    }
+    loadPanels(selectedCategoryId).catch((err) => {
+      console.error(err);
+      setError(err.message || "Failed to load panels");
+    });
+  }, [selectedCategoryId]);
+
+  useEffect(() => {
+    if (selectedPanelId == null) {
+      setSlots([]);
+      setDraftSlots({});
+      setDraftDirty(false);
+      return;
+    }
+    loadSlots(selectedPanelId)
+      .then(() => setDraftDirty(false))
+      .catch((err) => {
+        console.error(err);
+        setError(err.message || "Failed to load layout");
+      });
+  }, [selectedPanelId]);
+  const currentCategory = categories.find((cat) => cat.id === selectedCategoryId) || null;
+  const currentPanel = panels.find((panel) => panel.id === selectedPanelId) || null;
+  const gridRows = currentPanel ? currentPanel.gridRows : 4;
+  const gridCols = currentPanel ? currentPanel.gridCols : 5;
+
+  const gridCells = useMemo(() => {
+    const cells = [];
+    for (let row = 0; row < gridRows; row += 1) {
+      for (let col = 0; col < gridCols; col += 1) {
+        cells.push({ key: toCellKey(row, col), row, col });
+      }
+    }
+    return cells;
+  }, [gridRows, gridCols]);
+
+  useEffect(() => {
+    if (gridCells.length === 0) {
+      setSelectedCellKey(null);
+      return;
+    }
+    if (!selectedCellKey || !gridCells.some((cell) => cell.key === selectedCellKey)) {
+      setSelectedCellKey(gridCells[0].key);
+    }
+  }, [gridCells, selectedCellKey]);
+
+  useEffect(() => {
+    const map = {};
+    slots.forEach((slot) => {
+      map[toCellKey(slot.rowIndex, slot.colIndex)] = {
+        rowIndex: slot.rowIndex,
+        colIndex: slot.colIndex,
+        rowSpan: slot.rowSpan || 1,
+        colSpan: slot.colSpan || 1,
+        itemId: slot.itemId ?? null,
+        labelOverride: slot.labelOverride || "",
+        sortOrder: slot.sortOrder || 0
+      };
+    });
+    setDraftSlots(map);
+    setDraftDirty(false);
+  }, [slots]);
+
+  const selectedCell = useMemo(() => {
+    if (!selectedCellKey) return null;
+    const parsed = parseCellKey(selectedCellKey);
+    return { key: selectedCellKey, row: parsed.row, col: parsed.col };
+  }, [selectedCellKey]);
+
+  const selectedSlot = useMemo(() => {
+    if (!selectedCell) return null;
+    return (
+      draftSlots[selectedCell.key] || {
+        rowIndex: selectedCell.row,
+        colIndex: selectedCell.col,
+        rowSpan: 1,
+        colSpan: 1,
+        itemId: null,
+        labelOverride: "",
+        sortOrder: 0
+      }
+    );
+  }, [draftSlots, selectedCell]);
+
+  const itemsById = useMemo(() => {
+    const map = new Map();
+    items.forEach((item) => map.set(item.id, item));
+    return map;
+  }, [items]);
+
+  const assignedItemIds = useMemo(() => {
+    const ids = new Set();
+    Object.values(draftSlots).forEach((slot) => {
+      if (slot.itemId != null) ids.add(slot.itemId);
+    });
+    return ids;
+  }, [draftSlots]);
+
+  const itemsForSelectedCategory = useMemo(() => {
+    if (!selectedCategoryId) return items;
+    return items.filter((item) => item.categoryId === selectedCategoryId);
+  }, [items, selectedCategoryId]);
+
+  const unassignedItems = useMemo(() => {
+    return itemsForSelectedCategory.filter((item) => !assignedItemIds.has(item.id));
+  }, [itemsForSelectedCategory, assignedItemIds]);
+  function showSuccess(text) {
+    setMessage(text);
+    setError(null);
+  }
+
+  function showError(text) {
+    setError(text);
+    setMessage(null);
+  }
+
+  function updateSelectedSlot(changes) {
+    if (!selectedCell) return;
+    setDraftSlots((prev) => {
+      const key = selectedCell.key;
+      const base = prev[key] || {
+        rowIndex: selectedCell.row,
+        colIndex: selectedCell.col,
+        rowSpan: 1,
+        colSpan: 1,
+        itemId: null,
+        labelOverride: "",
+        sortOrder: 0
+      };
+      const next = { ...base, ...changes };
+      const map = { ...prev };
+      if (next.itemId == null && (!next.labelOverride || next.labelOverride.length === 0) && (!next.sortOrder || next.sortOrder === 0)) {
+        delete map[key];
+      } else {
+        map[key] = next;
+      }
+      return map;
+    });
+    setDraftDirty(true);
+  }
+
+  function clearSelectedSlot() {
+    if (!selectedCell) return;
+    setDraftSlots((prev) => {
+      if (!prev[selectedCell.key]) return prev;
+      const map = { ...prev };
+      delete map[selectedCell.key];
+      return map;
+    });
+    setDraftDirty(true);
+  }
+  async function handleSaveLayout() {
+    if (!selectedPanelId) return;
+    setSavingLayout(true);
+    try {
+      const payload = Object.values(draftSlots)
+        .filter((slot) => slot.itemId != null)
+        .map((slot) => ({
+          rowIndex: slot.rowIndex,
+          colIndex: slot.colIndex,
+          rowSpan: slot.rowSpan || 1,
+          colSpan: slot.colSpan || 1,
+          itemId: slot.itemId,
+          labelOverride: slot.labelOverride && slot.labelOverride.length > 0 ? slot.labelOverride : null,
+          sortOrder: slot.sortOrder || 0
+        }));
+
+      const saved = await fetchJson("/api/menu-layout/panels/" + selectedPanelId + "/slots", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slots: payload })
+      });
+
+      const savedMap = new Map();
+      saved.forEach((slot) => {
+        const row = slot.row_index ?? slot.rowIndex ?? 0;
+        const col = slot.col_index ?? slot.colIndex ?? 0;
+        savedMap.set(toCellKey(row, col), slot);
+      });
+
+      const updateRequests = [];
+      const assignedNow = new Set();
+
+      Object.values(draftSlots).forEach((slot) => {
+        if (slot.itemId == null) return;
+        const key = toCellKey(slot.rowIndex, slot.colIndex);
+        const savedSlot = savedMap.get(key);
+        if (!savedSlot) return;
+        assignedNow.add(slot.itemId);
+        updateRequests.push(
+          fetch("/api/menu/" + slot.itemId, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              panelId: selectedPanelId,
+              layoutSlotId: savedSlot.id,
+              categoryId: selectedCategoryId
+            })
+          })
+        );
+      });
+
+      items.forEach((item) => {
+        if (item.panelId === selectedPanelId && !assignedNow.has(item.id)) {
+          updateRequests.push(
+            fetch("/api/menu/" + item.id, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ panelId: null, layoutSlotId: null })
+            })
+          );
+        }
+      });
+
+      if (updateRequests.length > 0) {
+        await Promise.all(updateRequests);
+      }
+
+      await loadItems();
+      await loadSlots(selectedPanelId);
+      setDraftDirty(false);
+      showSuccess("Layout saved");
+    } catch (err) {
+      console.error(err);
+      showError(err.message || "Failed to save layout");
+    } finally {
+      setSavingLayout(false);
+    }
+  }
+  async function handleCreateCategory() {
+    const name = window.prompt("Category name?");
+    if (!name || !name.trim()) return;
+    const positionInput = window.prompt("Position (left, right, top)", "left") || "left";
+    try {
+      const created = await fetchJson("/api/menu-layout/categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim(),
+          position: positionInput.trim().toLowerCase()
+        })
+      });
+      await loadCategories(created.id);
+      showSuccess("Category created");
+    } catch (err) {
+      console.error(err);
+      showError(err.message || "Failed to create category");
+    }
+  }
+
+  async function handleRenameCategory(category) {
+    const next = window.prompt("Rename category", category.name);
+    if (!next || !next.trim()) return;
+    try {
+      await fetchJson("/api/menu-layout/categories/" + category.id, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: next.trim() })
+      });
+      await loadCategories(category.id);
+      showSuccess("Category updated");
+    } catch (err) {
+      console.error(err);
+      showError(err.message || "Failed to rename category");
+    }
+  }
+
+  async function handleDeleteCategory(category) {
+    if (!window.confirm("Delete category \"" + category.name + "\"?")) return;
+    try {
+      await fetchJson("/api/menu-layout/categories/" + category.id, { method: "DELETE" });
+      await loadCategories();
+      showSuccess("Category deleted");
+    } catch (err) {
+      console.error(err);
+      showError(err.message || "Failed to delete category");
+    }
+  }
+
+  async function handleCreatePanel() {
+    if (!selectedCategoryId) {
+      showError("Select a category first");
+      return;
+    }
+    const name = window.prompt("Panel name?", "New Panel");
+    if (!name || !name.trim()) return;
+    const rowsInput = window.prompt("Rows?", "4");
+    const colsInput = window.prompt("Columns?", "5");
+    const rows = Math.max(1, parseInt(rowsInput || "4", 10) || 4);
+    const cols = Math.max(1, parseInt(colsInput || "5", 10) || 5);
+    try {
+      const created = await fetchJson("/api/menu-layout/categories/" + selectedCategoryId + "/panels", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim(), gridRows: rows, gridCols: cols })
+      });
+      await loadPanels(selectedCategoryId, created.id);
+      showSuccess("Panel created");
+    } catch (err) {
+      console.error(err);
+      showError(err.message || "Failed to create panel");
+    }
+  }
+
+  async function handleRenamePanel(panel) {
+    const next = window.prompt("Rename panel", panel.name);
+    if (!next || !next.trim()) return;
+    try {
+      await fetchJson("/api/menu-layout/panels/" + panel.id, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: next.trim() })
+      });
+      await loadPanels(panel.categoryId, panel.id);
+      showSuccess("Panel updated");
+    } catch (err) {
+      console.error(err);
+      showError(err.message || "Failed to rename panel");
+    }
+  }
+
+  async function handleDeletePanel(panel) {
+    if (!window.confirm("Delete panel \"" + panel.name + "\"?")) return;
+    try {
+      await fetchJson("/api/menu-layout/panels/" + panel.id, { method: "DELETE" });
+      await loadPanels(panel.categoryId);
+      showSuccess("Panel deleted");
+    } catch (err) {
+      console.error(err);
+      showError(err.message || "Failed to delete panel");
+    }
+  }
+  function openItemForm(mode, item) {
+    if (mode === "create") {
+      setItemForm({
+        mode: "create",
+        values: {
+          ...emptyItemDraft,
+          categoryId: selectedCategoryId
+        }
+      });
+    } else if (mode === "edit" && item) {
+      setItemForm({
+        mode: "edit",
+        values: {
+          id: item.id,
+          name: item.name,
+          price: item.price,
+          categoryId: item.categoryId,
+          buttonLabel: item.buttonLabel || "",
+          buttonColor: item.buttonColor || "",
+          sortOrder: item.sortOrder || 0,
+          isVisible: item.isVisible !== false
+        }
+      });
+    }
+  }
+
+  function closeItemForm() {
+    setItemForm(null);
+  }
+
+  async function handleSubmitItem(values) {
+    const payload = {
+      name: values.name.trim(),
+      price: Number(values.price),
+      categoryId: values.categoryId != null ? Number(values.categoryId) : null,
+      buttonLabel: values.buttonLabel && values.buttonLabel.trim().length > 0 ? values.buttonLabel.trim() : null,
+      buttonColor: values.buttonColor && values.buttonColor.trim().length > 0 ? values.buttonColor.trim() : null,
+      sortOrder: Number.isFinite(Number(values.sortOrder)) ? Number(values.sortOrder) : 0,
+      isVisible: values.isVisible !== false
+    };
+
+    if (!payload.name || Number.isNaN(payload.price)) {
+      showError("Item name and price are required");
+      return;
+    }
+
+    if (payload.categoryId != null) {
+      const category = categories.find((cat) => cat.id === payload.categoryId);
+      payload.category = category ? category.name.toLowerCase() : null;
+    }
+
+    try {
+      if (values.id) {
+        await fetchJson("/api/menu/" + values.id, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        showSuccess("Item updated");
+      } else {
+        await fetchJson("/api/menu", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        showSuccess("Item created");
+      }
+      await loadItems();
+      closeItemForm();
+    } catch (err) {
+      console.error(err);
+      showError(err.message || "Failed to save item");
+    }
+  }
+
+  async function handleDeleteItem(item) {
+    if (!window.confirm("Delete item \"" + item.name + "\"?")) return;
+    try {
+      await fetchJson("/api/menu/" + item.id, { method: "DELETE" });
+      await loadItems();
+      showSuccess("Item deleted");
+    } catch (err) {
+      console.error(err);
+      showError(err.message || "Failed to delete item");
+    }
+  }
+  function openModifierManager(item) {
+    setModifierContext(item);
+  }
+
+  function closeModifierManager() {
+    setModifierContext(null);
+  }
+
+  async function handleCreateModifierGroup(item, formValues) {
+    try {
+      await fetchJson("/api/modifiers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: formValues.name.trim(),
+          menu_id: item.id,
+          is_required: formValues.isRequired,
+          is_multiple: formValues.isMultiple,
+          selection_mode: formValues.selectionMode
+        })
+      });
+      await loadModifiers();
+      showSuccess("Modifier group added");
+    } catch (err) {
+      console.error(err);
+      showError(err.message || "Failed to add modifier group");
+    }
+  }
+
+  async function handleUpdateModifierGroup(groupId, formValues) {
+    try {
+      await fetchJson("/api/modifiers/" + groupId, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: formValues.name.trim(),
+          is_required: formValues.isRequired,
+          is_multiple: formValues.isMultiple
+        })
+      });
+      await loadModifiers();
+      showSuccess("Modifier group updated");
+    } catch (err) {
+      console.error(err);
+      showError(err.message || "Failed to update modifier group");
+    }
+  }
+
+  async function handleDeleteModifierGroup(groupId) {
+    if (!window.confirm("Delete modifier group?")) return;
+    try {
+      await fetchJson("/api/modifiers/" + groupId, { method: "DELETE" });
+      await loadModifiers();
+      showSuccess("Modifier group deleted");
+    } catch (err) {
+      console.error(err);
+      showError(err.message || "Failed to delete modifier group");
+    }
+  }
+
+  async function handleCreateModifierOption(groupId, formValues) {
+    try {
+      await fetchJson("/api/modifiers/options", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          modifier_id: groupId,
+          label: formValues.label.trim(),
+          price_delta: Number(formValues.priceDelta || 0)
+        })
+      });
+      await loadModifiers();
+      showSuccess("Option added");
+    } catch (err) {
+      console.error(err);
+      showError(err.message || "Failed to add option");
+    }
+  }
+
+  async function handleUpdateModifierOption(optionId, formValues) {
+    try {
+      await fetchJson("/api/modifiers/options/" + optionId, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          label: formValues.label.trim(),
+          price_delta: Number(formValues.priceDelta || 0)
+        })
+      });
+      await loadModifiers();
+      showSuccess("Option updated");
+    } catch (err) {
+      console.error(err);
+      showError(err.message || "Failed to update option");
+    }
+  }
+
+  async function handleDeleteModifierOption(optionId) {
+    if (!window.confirm("Delete option?")) return;
+    try {
+      await fetchJson("/api/modifiers/options/" + optionId, { method: "DELETE" });
+      await loadModifiers();
+      showSuccess("Option deleted");
+    } catch (err) {
+      console.error(err);
+      showError(err.message || "Failed to delete option");
+    }
+  }
+  const slotsAssignedCount = Object.keys(draftSlots).length;
+
+  const modifierGroupsForContext = useMemo(() => {
+    if (!modifierContext) return [];
+    return modifiers.filter((mod) => mod.menu_id === modifierContext.id || mod.menuId === modifierContext.id);
+  }, [modifiers, modifierContext]);
+
+  function optionsForGroup(groupId) {
+    return modifierOptions[groupId] || [];
+  }
+  if (loading) {
+    return (
+      <div style={layoutStyles.page}>
+        <BackButton label="Back to Back Office" to="/backoffice" />
+        <h1>Menu Builder</h1>
+        <p>Loading menu data...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div style={layoutStyles.page}>
+      <BackButton label="Back to Back Office" to="/backoffice" />
+      <h1 style={{ marginTop: 10, marginBottom: 6 }}>Menu Builder</h1>
+      <p style={{ color: "#6b7280", marginTop: 0 }}>Configure categories, panels, button layout, and modifiers.</p>
+
+      <div style={layoutStyles.tabRow}>
+        <button type="button" style={view === "layout" ? layoutStyles.tabActive : layoutStyles.tab} onClick={() => setView("layout")}>
+          Layout
+        </button>
+        <button type="button" style={view === "items" ? layoutStyles.tabActive : layoutStyles.tab} onClick={() => setView("items")}>
+          Items & Modifiers
+        </button>
+      </div>
+
+      {message && <MessageBanner type="success" text={message} onClose={() => setMessage(null)} />}
+      {error && <MessageBanner type="error" text={error} onClose={() => setError(null)} />}
+
+      {view === "layout" && (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "260px 1fr 320px",
+            gap: 24,
+            alignItems: "start",
+            marginTop: 24
+          }}
+        >
+          <div style={layoutStyles.card}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h3 style={{ margin: 0 }}>Categories</h3>
+              <button type="button" style={layoutStyles.primaryButton} onClick={handleCreateCategory}>
+                Add
+              </button>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {categories.length === 0 && <div style={{ color: "#6b7280", fontSize: 13 }}>No categories yet.</div>}
+              {categories.map((category) => (
+                <div
+                  key={category.id}
+                  style={{
+                    border: "1px solid #d1d5db",
+                    borderRadius: 10,
+                    padding: "10px 12px",
+                    backgroundColor: category.id === selectedCategoryId ? "#2563eb" : "#f9fafb",
+                    color: category.id === selectedCategoryId ? "#fff" : "#1f2937",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    cursor: "pointer"
+                  }}
+                  onClick={() => setSelectedCategoryId(category.id)}
+                >
+                  <div>
+                    <div style={{ fontWeight: 600 }}>{category.name}</div>
+                    <div style={{ fontSize: 12, opacity: 0.8 }}>Position: {category.position}</div>
+                  </div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button
+                      type="button"
+                      style={{ ...layoutStyles.secondaryButton, padding: "6px 10px" }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRenameCategory(category);
+                      }}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      style={{ ...layoutStyles.secondaryButton, padding: "6px 10px" }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteCategory(category);
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={layoutStyles.card}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h3 style={{ margin: 0 }}>Panels</h3>
+              <button type="button" style={layoutStyles.primaryButton} onClick={handleCreatePanel}>
+                Add Panel
+              </button>
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+              {panels.length === 0 && <div style={{ color: "#6b7280" }}>No panels yet.</div>}
+              {panels.map((panel) => (
+                <div
+                  key={panel.id}
+                  style={{
+                    border: panel.id === selectedPanelId ? "2px solid #2563eb" : "1px solid #d1d5db",
+                    borderRadius: 12,
+                    padding: "10px 14px",
+                    backgroundColor: panel.id === selectedPanelId ? "#2563eb" : "#f3f4f6",
+                    color: panel.id === selectedPanelId ? "#fff" : "#1f2937",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    cursor: "pointer"
+                  }}
+                  onClick={() => setSelectedPanelId(panel.id)}
+                >
+                  <div>
+                    <div style={{ fontWeight: 600 }}>{panel.name}</div>
+                    <div style={{ fontSize: 12 }}>Grid {panel.gridRows} x {panel.gridCols}</div>
+                  </div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button
+                      type="button"
+                      style={{ ...layoutStyles.secondaryButton, padding: "6px 10px" }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRenamePanel(panel);
+                      }}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      style={{ ...layoutStyles.secondaryButton, padding: "6px 10px" }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeletePanel(panel);
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {currentPanel ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(" + gridCols + ", 1fr)",
+                    gap: 10
+                  }}
+                >
+                  {gridCells.map((cell) => {
+                    const slot = draftSlots[cell.key];
+                    const isSelected = selectedCellKey === cell.key;
+                    const item = slot && slot.itemId != null ? itemsById.get(slot.itemId) : null;
+                    return (
+                      <button
+                        type="button"
+                        key={cell.key}
+                        onClick={() => setSelectedCellKey(cell.key)}
+                        style={{
+                          width: "100%",
+                          height: 72,
+                          borderRadius: 10,
+                          border: isSelected ? "2px solid #1d4ed8" : "1px solid #d1d5db",
+                          backgroundColor: item ? "#1d4ed8" : isSelected ? "#1e3a8a" : "#f9fafb",
+                          color: item || isSelected ? "#fff" : "#4b5563",
+                          display: "flex",
+                          flexDirection: "column",
+                          justifyContent: "center",
+                          alignItems: "center",
+                          gap: 6
+                        }}
+                      >
+                        <span style={{ fontWeight: 600 }}>{item ? (slot.labelOverride || item.buttonLabel || item.name) : "Empty"}</span>
+                        <span style={{ fontSize: 12 }}>Row {cell.row + 1}, Col {cell.col + 1}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ color: "#6b7280", fontSize: 13 }}>Assigned cells: {slotsAssignedCount}</div>
+                  <button type="button" style={layoutStyles.primaryButton} onClick={handleSaveLayout} disabled={savingLayout || !draftDirty}>
+                    {savingLayout ? "Saving..." : "Save Layout"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ color: "#6b7280" }}>Create a panel to start placing items.</div>
+            )}
+          </div>
+
+          <div style={layoutStyles.card}>
+            <h3 style={{ margin: 0 }}>Cell Details</h3>
+            {selectedSlot ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <div style={{ fontSize: 13, color: "#6b7280" }}>
+                  Position: Row {selectedSlot.rowIndex + 1}, Column {selectedSlot.colIndex + 1}
+                </div>
+                <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <span>Menu item</span>
+                  <select
+                    style={layoutStyles.input}
+                    value={selectedSlot.itemId ?? ""}
+                    onChange={(e) => {
+                      const value = e.target.value ? Number(e.target.value) : null;
+                      updateSelectedSlot({ itemId: value });
+                    }}
+                  >
+                    <option value="">-- Unassigned --</option>
+                    {itemsForSelectedCategory.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name} ($ {item.price.toFixed(2)})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <span>Label override</span>
+                  <input
+                    style={layoutStyles.input}
+                    value={selectedSlot.labelOverride || ""}
+                    onChange={(e) => updateSelectedSlot({ labelOverride: e.target.value })}
+                  />
+                </label>
+                <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <span>Sort order</span>
+                  <input
+                    style={layoutStyles.input}
+                    type="number"
+                    value={selectedSlot.sortOrder || 0}
+                    onChange={(e) => updateSelectedSlot({ sortOrder: Number(e.target.value) || 0 })}
+                  />
+                </label>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button type="button" style={layoutStyles.primaryButton} onClick={handleSaveLayout} disabled={savingLayout || !draftDirty}>
+                    {savingLayout ? "Saving..." : "Save Layout"}
+                  </button>
+                  <button type="button" style={layoutStyles.secondaryButton} onClick={clearSelectedSlot}>
+                    Clear
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ color: "#6b7280" }}>Select a cell to edit details.</div>
+            )}
+
+            <div style={{ marginTop: 18 }}>
+              <h4 style={{ marginBottom: 10 }}>Unassigned Items</h4>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 240, overflowY: "auto" }}>
+                {unassignedItems.length === 0 && <div style={{ color: "#6b7280", fontSize: 13 }}>All items placed in grid.</div>}
+                {unassignedItems.map((item) => (
+                  <div
+                    key={item.id}
+                    style={{
+                      border: "1px solid #e5e7eb",
+                      borderRadius: 8,
+                      padding: "8px 10px",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center"
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 600 }}>{item.name}</div>
+                      <div style={{ fontSize: 12, color: "#6b7280" }}>$ {item.price.toFixed(2)}</div>
+                    </div>
+                    <button
+                      type="button"
+                      style={{ ...layoutStyles.primaryButton, padding: "6px 10px" }}
+                      onClick={() => {
+                        if (!selectedCell) return;
+                        setSelectedCellKey(selectedCell.key);
+                        updateSelectedSlot({ itemId: item.id });
+                      }}
+                    >
+                      Place
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {view === "items" && (
+        <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 18 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <h3 style={{ margin: 0 }}>Menu Items</h3>
+            <button type="button" style={layoutStyles.primaryButton} onClick={() => openItemForm("create")}>Add Item</button>
+          </div>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ backgroundColor: "#f3f4f6", textAlign: "left" }}>
+                  <th style={{ padding: "10px 12px" }}>Name</th>
+                  <th style={{ padding: "10px 12px" }}>Price</th>
+                  <th style={{ padding: "10px 12px" }}>Category</th>
+                  <th style={{ padding: "10px 12px" }}>Panel</th>
+                  <th style={{ padding: "10px 12px" }}>Visible</th>
+                  <th style={{ padding: "10px 12px" }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item) => {
+                  const category = categories.find((cat) => cat.id === item.categoryId);
+                  const panel = panels.find((p) => p.id === item.panelId);
+                  return (
+                    <tr key={item.id} style={{ borderBottom: "1px solid #e5e7eb" }}>
+                      <td style={{ padding: "10px 12px", fontWeight: 600 }}>{item.name}</td>
+                      <td style={{ padding: "10px 12px" }}>$ {item.price.toFixed(2)}</td>
+                      <td style={{ padding: "10px 12px" }}>{category ? category.name : "—"}</td>
+                      <td style={{ padding: "10px 12px" }}>{panel ? panel.name : "—"}</td>
+                      <td style={{ padding: "10px 12px" }}>{item.isVisible ? "Yes" : "No"}</td>
+                      <td style={{ padding: "10px 12px" }}>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button type="button" style={{ ...layoutStyles.secondaryButton, padding: "6px 10px" }} onClick={() => openItemForm("edit", item)}>
+                            Edit
+                          </button>
+                          <button type="button" style={{ ...layoutStyles.secondaryButton, padding: "6px 10px" }} onClick={() => openModifierManager(item)}>
+                            Modifiers
+                          </button>
+                          <button type="button" style={{ ...layoutStyles.secondaryButton, padding: "6px 10px" }} onClick={() => handleDeleteItem(item)}>
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+      {itemForm && (
+        <ItemEditorModal
+          categories={categories}
+          draft={itemForm.values}
+          onSubmit={handleSubmitItem}
+          onClose={closeItemForm}
+        />
+      )}
+
+      {modifierContext && (
+        <ModifierManagerModal
+          item={modifierContext}
+          groups={modifierGroupsForContext}
+          optionsForGroup={optionsForGroup}
+          onCreateGroup={handleCreateModifierGroup}
+          onUpdateGroup={handleUpdateModifierGroup}
+          onDeleteGroup={handleDeleteModifierGroup}
+          onCreateOption={handleCreateModifierOption}
+          onUpdateOption={handleUpdateModifierOption}
+          onDeleteOption={handleDeleteModifierOption}
+          onClose={closeModifierManager}
+        />
+      )}
+    </div>
+  );
+}
+function ItemEditorModal({ categories, draft, onSubmit, onClose }) {
+  const [form, setForm] = useState({
+    id: draft.id || null,
+    name: draft.name || "",
+    price: draft.price || "",
+    categoryId: draft.categoryId != null ? draft.categoryId : "",
+    buttonLabel: draft.buttonLabel || "",
+    buttonColor: draft.buttonColor || "",
+    sortOrder: draft.sortOrder || 0,
+    isVisible: draft.isVisible !== false
+  });
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        backgroundColor: "rgba(15, 23, 42, 0.45)",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        padding: 20,
+        zIndex: 1200
+      }}
+    >
+      <div
+        style={{
+          backgroundColor: "#fff",
+          borderRadius: 12,
+          padding: 24,
+          boxShadow: "0 20px 50px rgba(15, 23, 42, 0.25)",
+          width: 420,
+          maxWidth: "100%"
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <h2 style={{ margin: 0 }}>{form.id ? "Edit Item" : "Add Item"}</h2>
+          <button type="button" onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#6b7280" }}>
+            x
+          </button>
+        </div>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            onSubmit(form);
+          }}
+          style={{ display: "flex", flexDirection: "column", gap: 12 }}
+        >
+          <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <span>Name</span>
+            <input
+              required
+              style={layoutStyles.input}
+              value={form.name}
+              onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+            />
+          </label>
+          <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <span>Price</span>
+            <input
+              required
+              type="number"
+              step="0.01"
+              style={layoutStyles.input}
+              value={form.price}
+              onChange={(e) => setForm((prev) => ({ ...prev, price: e.target.value }))}
+            />
+          </label>
+          <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <span>Category</span>
+            <select
+              style={layoutStyles.input}
+              value={form.categoryId === null ? "" : form.categoryId}
+              onChange={(e) => setForm((prev) => ({ ...prev, categoryId: e.target.value ? Number(e.target.value) : null }))}
+            >
+              <option value="">Uncategorised</option>
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <span>Button label</span>
+            <input
+              style={layoutStyles.input}
+              value={form.buttonLabel}
+              onChange={(e) => setForm((prev) => ({ ...prev, buttonLabel: e.target.value }))}
+            />
+          </label>
+          <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <span>Button color</span>
+            <input
+              style={layoutStyles.input}
+              value={form.buttonColor}
+              onChange={(e) => setForm((prev) => ({ ...prev, buttonColor: e.target.value }))}
+              placeholder="#2563eb"
+            />
+          </label>
+          <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <span>Sort order</span>
+            <input
+              style={layoutStyles.input}
+              type="number"
+              value={form.sortOrder}
+              onChange={(e) => setForm((prev) => ({ ...prev, sortOrder: Number(e.target.value) || 0 }))}
+            />
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <input
+              type="checkbox"
+              checked={form.isVisible}
+              onChange={(e) => setForm((prev) => ({ ...prev, isVisible: e.target.checked }))}
+            />
+            <span>Visible on ordering screen</span>
+          </label>
+          <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
+            <button type="submit" style={layoutStyles.primaryButton}>{form.id ? "Save" : "Create"}</button>
+            <button type="button" style={layoutStyles.secondaryButton} onClick={onClose}>
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+function ModifierManagerModal({
+  item,
+  groups,
+  optionsForGroup,
+  onCreateGroup,
+  onUpdateGroup,
+  onDeleteGroup,
+  onCreateOption,
+  onUpdateOption,
+  onDeleteOption,
+  onClose
+}) {
+  const [groupDraft, setGroupDraft] = useState({
+    name: "",
+    selectionMode: "whole",
+    isRequired: false,
+    isMultiple: false
+  });
+  const [optionDraft, setOptionDraft] = useState({ groupId: "", label: "", priceDelta: "0" });
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        backgroundColor: "rgba(15, 23, 42, 0.45)",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        padding: 20,
+        zIndex: 1200
+      }}
+    >
+      <div
+        style={{
+          backgroundColor: "#fff",
+          borderRadius: 12,
+          padding: 24,
+          boxShadow: "0 20px 50px rgba(15, 23, 42, 0.25)",
+          width: 640,
+          maxWidth: "100%",
+          maxHeight: "90vh",
+          overflowY: "auto"
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <h2 style={{ margin: 0 }}>Modifiers / {item.name}</h2>
+          <button type="button" onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#6b7280" }}>
+            x
+          </button>
+        </div>
+
+        <section style={{ marginBottom: 18 }}>
+          <h3 style={{ margin: "0 0 10px 0" }}>Add Group</h3>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!groupDraft.name.trim()) {
+                onClose();
+                return;
+              }
+              onCreateGroup(item, groupDraft);
+              setGroupDraft({ name: "", selectionMode: "whole", isRequired: false, isMultiple: false });
+            }}
+            style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}
+          >
+            <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <span>Name</span>
+              <input
+                style={layoutStyles.input}
+                value={groupDraft.name}
+                onChange={(e) => setGroupDraft((prev) => ({ ...prev, name: e.target.value }))}
+                required
+              />
+            </label>
+            <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <span>Selection mode</span>
+              <select
+                style={layoutStyles.input}
+                value={groupDraft.selectionMode}
+                onChange={(e) => setGroupDraft((prev) => ({ ...prev, selectionMode: e.target.value }))}
+              >
+                <option value="whole">Whole item</option>
+                <option value="half">Half only</option>
+                <option value="half_and_half">Half & Whole</option>
+              </select>
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <input
+                type="checkbox"
+                checked={groupDraft.isRequired}
+                onChange={(e) => setGroupDraft((prev) => ({ ...prev, isRequired: e.target.checked }))}
+              />
+              <span>Required</span>
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <input
+                type="checkbox"
+                checked={groupDraft.isMultiple}
+                onChange={(e) => setGroupDraft((prev) => ({ ...prev, isMultiple: e.target.checked }))}
+              />
+              <span>Allow multiple selections</span>
+            </label>
+            <div style={{ gridColumn: "1 / span 2", display: "flex", gap: 10 }}>
+              <button type="submit" style={layoutStyles.primaryButton}>Add Group</button>
+              <button type="button" style={layoutStyles.secondaryButton} onClick={() => setGroupDraft({ name: "", selectionMode: "whole", isRequired: false, isMultiple: false })}>
+                Clear
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <section style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {groups.length === 0 && <div style={{ color: "#6b7280" }}>No modifier groups yet.</div>}
+          {groups.map((group) => (
+            <div key={group.id} style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: "12px 14px", display: "flex", flexDirection: "column", gap: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <div style={{ fontWeight: 600 }}>{group.name}</div>
+                  <div style={{ fontSize: 12, color: "#6b7280" }}>
+                    {(group.is_required ? "Required" : "Optional") + " / " + (group.is_multiple ? "Multi-select" : "Single") + " / " + (group.selection_mode || "whole")}
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button
+                    type="button"
+                    style={{ ...layoutStyles.secondaryButton, padding: "6px 10px" }}
+                    onClick={() => {
+                      const nextName = window.prompt("Rename group", group.name);
+                      if (!nextName || !nextName.trim()) return;
+                      const makeRequired = window.confirm("Should this group be required?");
+                      const allowMultiple = window.confirm("Allow multiple selections?");
+                      onUpdateGroup(group.id, {
+                        name: nextName,
+                        isRequired: makeRequired,
+                        isMultiple: allowMultiple
+                      });
+                    }}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    style={{ ...layoutStyles.secondaryButton, padding: "6px 10px" }}
+                    onClick={() => onDeleteGroup(group.id)}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {optionsForGroup(group.id).map((option) => (
+                  <div key={option.id} style={{ border: "1px solid #d1d5db", borderRadius: 8, padding: "8px 10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <div style={{ fontWeight: 600 }}>{option.label}</div>
+                      <div style={{ fontSize: 12, color: "#6b7280" }}>+ $ {Number(option.price_delta || 0).toFixed(2)}</div>
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button
+                        type="button"
+                        style={{ ...layoutStyles.secondaryButton, padding: "6px 10px" }}
+                        onClick={() => {
+                          const nextLabel = window.prompt("Rename option", option.label);
+                          if (!nextLabel || !nextLabel.trim()) return;
+                          const nextPrice = window.prompt("Price delta", String(option.price_delta || 0)) || "0";
+                          onUpdateOption(option.id, { label: nextLabel, priceDelta: Number(nextPrice) || 0 });
+                        }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        style={{ ...layoutStyles.secondaryButton, padding: "6px 10px" }}
+                        onClick={() => onDeleteOption(option.id)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!optionDraft.label.trim()) return;
+                    onCreateOption(group.id, optionDraft);
+                    setOptionDraft({ groupId: "", label: "", priceDelta: "0" });
+                  }}
+                  style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}
+                >
+                  <input
+                    style={{ ...layoutStyles.input, flex: 1, minWidth: 140 }}
+                    placeholder="Option name"
+                    value={optionDraft.groupId === group.id ? optionDraft.label : ""}
+                    onChange={(e) => setOptionDraft({ groupId: group.id, label: e.target.value, priceDelta: optionDraft.priceDelta })}
+                  />
+                  <input
+                    style={{ ...layoutStyles.input, width: 100 }}
+                    type="number"
+                    step="0.01"
+                    placeholder="Price"
+                    value={optionDraft.groupId === group.id ? optionDraft.priceDelta : "0"}
+                    onChange={(e) => setOptionDraft({ groupId: group.id, label: optionDraft.label, priceDelta: e.target.value })}
+                  />
+                  <button type="submit" style={{ ...layoutStyles.primaryButton, padding: "10px 14px" }}>
+                    Add Option
+                  </button>
+                </form>
+              </div>
+            </div>
+          ))}
+        </section>
+      </div>
+    </div>
+  );
+}
 
 export default BackOfficeMenu;
