@@ -2,6 +2,16 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import BackButton from "../components/BackButton";
 
+const formatModifierOption = (option) => {
+  if (!option) return "";
+  const label = option.label || "";
+  const portion = option.portion && option.portion !== "whole"
+    ? option.portion === "left" ? "Left Half" : option.portion === "right" ? "Right Half" : option.portion
+    : "";
+  const priceText = option.price_delta ? ` (+$${Number(option.price_delta).toFixed(2)})` : "";
+  return portion ? `${portion}: ${label}${priceText}` : `${label}${priceText}`;
+};
+
 function VoidOrders() {
   const [orders, setOrders] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -100,34 +110,38 @@ function VoidOrders() {
                   {parsedItems.length === 0 ? (
                     <li>No items</li>
                   ) : (
-                    parsedItems.map((item, i) => (
-                      <li key={i} style={{ marginBottom: "6px" }}>
-                        <div>
-                          <strong>
-                            {item.quantity && item.quantity > 1 ? `${item.quantity}x ` : ""}
-                            {item.name}
-                          </strong>{" "}
-                          – $
-                          {(item.quantity && item.quantity > 1
-                            ? item.price * item.quantity
-                            : item.price
-                          ).toFixed(2)}
-                        </div>
+                    parsedItems.map((item, i) => {
+                      const quantity = item.quantity && item.quantity > 0 ? item.quantity : 1;
+                      const unitPrice = item.unit_price != null ? Number(item.unit_price) : Number(item.price || 0);
+                      const lineTotal = unitPrice * quantity;
+
+                      return (
+                        <li key={i} style={{ marginBottom: "6px" }}>
+                          <div>
+                            <strong>
+                              {quantity > 1 ? `${quantity}x ` : ""}
+                              {item.name}
+                            </strong>{" "}
+                            – ${lineTotal.toFixed(2)}
+                            {quantity > 1 && (
+                              <span style={{ fontSize: "0.85em", color: "#6b7280", marginLeft: 4 }}>
+                                @ ${unitPrice.toFixed(2)}
+                              </span>
+                            )}
+                          </div>
                         {item.modifiers?.length > 0 && (
                           <ul style={{ marginLeft: "12px", fontSize: "0.9em", color: "#555" }}>
                             {item.modifiers.map((mod, j) => (
                               <li key={j}>
                                 <strong>{mod.name}:</strong>{" "}
-                                {mod.options.map((opt) => {
-                                  const price = opt.price_delta || 0;
-                                  return `${opt.label}${price > 0 ? ` (+${price.toFixed(2)})` : ""}`;
-                                }).join(", ")}
+                                {mod.options.map(formatModifierOption).join(", ")}
                               </li>
                             ))}
                           </ul>
                         )}
-                      </li>
-                    ))
+                        </li>
+                      );
+                    })
                   )}
                 </ul>
 

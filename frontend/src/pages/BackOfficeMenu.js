@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import BackButton from "../components/BackButton";
+import ModifierManagerModal from "../components/ModifierManagerModal";
 
 const layoutStyles = {
   page: { padding: "30px", fontFamily: "Arial, sans-serif" },
@@ -84,6 +85,56 @@ function parseCellKey(key) {
   };
 }
 
+function normalizeModifierOption(raw) {
+  const id = raw.id != null ? Number(raw.id) : null;
+  const price = raw.priceDelta != null ? Number(raw.priceDelta) : raw.price_delta != null ? Number(raw.price_delta) : 0;
+  const sort = raw.sortOrder != null ? Number(raw.sortOrder) : raw.sort_order != null ? Number(raw.sort_order) : 0;
+  return {
+    id,
+    label: raw.label || "",
+    priceDelta: price,
+    sortOrder: sort,
+    isDefault: raw.isDefault === true || raw.is_default === 1 || raw.is_default === true
+  };
+}
+
+function normalizeModifierGroup(raw) {
+  if (!raw) return null;
+  const selectionRaw = (raw.selectionMode || raw.selection_mode || 'whole').toLowerCase();
+  const normalizedSelection = selectionRaw === 'half' || selectionRaw === 'left_right' || selectionRaw === 'half_and_half'
+    ? 'left_right'
+    : 'whole';
+
+
+  const options = (raw.options || [])
+    .map(normalizeModifierOption)
+    .sort((a, b) => {
+      if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+      return a.label.localeCompare(b.label);
+    });
+
+  return {
+    id: raw.id != null ? Number(raw.id) : null,
+    menuId: raw.menuId != null ? Number(raw.menuId) : raw.menu_id != null ? Number(raw.menu_id) : null,
+    name: raw.name || "",
+    isRequired: raw.isRequired === true || raw.is_required === 1 || raw.is_required === true,
+    isMultiple: raw.isMultiple === true || raw.is_multiple === 1 || raw.is_multiple === true,
+    selectionMode: normalizedSelection,
+    sortOrder: raw.sortOrder != null ? Number(raw.sortOrder) : raw.sort_order != null ? Number(raw.sort_order) : 0,
+    options
+  };
+}
+
+function normalizeModifierGroupList(list) {
+  return (list || [])
+    .map(normalizeModifierGroup)
+    .filter(Boolean)
+    .sort((a, b) => {
+      if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+      return a.name.localeCompare(b.name);
+    });
+}
+
 async function fetchJson(url, options) {
   const res = await fetch(url, options);
   if (!res.ok) {
@@ -146,12 +197,18 @@ function BackOfficeMenu() {
   const [selectedCellKey, setSelectedCellKey] = useState(null);
   const [savingLayout, setSavingLayout] = useState(false);
 
+  const [categoryFormVisible, setCategoryFormVisible] = useState(false);
+  const [categoryForm, setCategoryForm] = useState({ name: "", position: "left" });
+
+  const [panelFormVisible, setPanelFormVisible] = useState(false);
+  const [panelForm, setPanelForm] = useState({ name: "", rows: 4, cols: 5 });
+
   const [items, setItems] = useState([]);
   const [itemForm, setItemForm] = useState(null);
 
-  const [modifiers, setModifiers] = useState([]);
-  const [modifierOptions, setModifierOptions] = useState({});
   const [modifierContext, setModifierContext] = useState(null);
+  const [modifierContextGroups, setModifierContextGroups] = useState([]);
+  const [modifierEditorLoading, setModifierEditorLoading] = useState(false);
 
   async function loadItems() {
     const data = await fetchJson("/api/menu");
@@ -234,24 +291,10 @@ function BackOfficeMenu() {
     setSlots(normalized);
     return normalized;
   }
-  async function loadModifiers() {
-    const modList = await fetchJson("/api/modifiers");
-    setModifiers(modList);
-    const optionsMap = {};
-    for (const mod of modList) {
-      try {
-        optionsMap[mod.id] = await fetchJson("/api/modifiers/options/" + mod.id);
-      } catch (err) {
-        optionsMap[mod.id] = [];
-      }
-    }
-    setModifierOptions(optionsMap);
-  }
   useEffect(() => {
     async function bootstrap() {
       try {
         await Promise.all([loadItems(), loadCategories()]);
-        await loadModifiers();
       } catch (err) {
         console.error(err);
         setError(err.message || "Failed to load menu data");
@@ -497,25 +540,69 @@ function BackOfficeMenu() {
       setSavingLayout(false);
     }
   }
-  async function handleCreateCategory() {
-    const name = window.prompt("Category name?");
-    if (!name || !name.trim()) return;
-    const positionInput = window.prompt("Position (left, right, top)", "left") || "left";
+  function resetCategoryForm() {
+    setCategoryForm({ name: "", position: "left" });
+  }
+
+  function openCategoryForm() {
+    resetCategoryForm();
+    setCategoryFormVisible(true);
+  }
+
+  function closeCategoryForm() {
+    resetCategoryForm();
+    setCategoryFormVisible(false);
+  }
+
+  async function handleCreateCategorySubmit(e) {
+    if (e) e.preventDefault();
+    const name = (categoryForm.name || "").trim();
+    if (!name) {
+      showError("Category name is required");
+      return;
+    }
+
+    const allowedPositions = ["left", "right", "top"];
+    const requested = (categoryForm.position || "left").toLowerCase();
+    const position = allowedPositions.includes(requested) ? requested : "left";
+
     try {
       const created = await fetchJson("/api/menu-layout/categories", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: name.trim(),
-          position: positionInput.trim().toLowerCase()
+          name,
+          position
         })
       });
+      closeCategoryForm();
       await loadCategories(created.id);
       showSuccess("Category created");
     } catch (err) {
       console.error(err);
       showError(err.message || "Failed to create category");
     }
+  }
+
+  async function refreshModifierContextGroups(itemId) {
+    if (!itemId) return;
+    try {
+      setModifierEditorLoading(true);
+      const groups = await fetchJson(`/api/modifiers/by-menu/${itemId}`);
+      const normalized = normalizeModifierGroupList(groups);
+      setModifierContextGroups(normalized);
+    } catch (err) {
+      console.error(err);
+      setError(err.message || 'Failed to load modifiers');
+    } finally {
+      setModifierEditorLoading(false);
+    }
+  }
+
+  async function fetchGroupsForMenu(itemId) {
+    if (!itemId) return [];
+    const groups = await fetchJson(`/api/modifiers/by-menu/${itemId}`);
+    return normalizeModifierGroupList(groups);
   }
 
   async function handleRenameCategory(category) {
@@ -547,23 +634,46 @@ function BackOfficeMenu() {
     }
   }
 
-  async function handleCreatePanel() {
+  function resetPanelForm() {
+    setPanelForm({ name: "", rows: 4, cols: 5 });
+  }
+
+  function openPanelForm() {
+    resetPanelForm();
+    setPanelFormVisible(true);
+  }
+
+  function closePanelForm() {
+    resetPanelForm();
+    setPanelFormVisible(false);
+  }
+
+  async function handleCreatePanelSubmit(e) {
+    if (e) e.preventDefault();
     if (!selectedCategoryId) {
       showError("Select a category first");
       return;
     }
-    const name = window.prompt("Panel name?", "New Panel");
-    if (!name || !name.trim()) return;
-    const rowsInput = window.prompt("Rows?", "4");
-    const colsInput = window.prompt("Columns?", "5");
-    const rows = Math.max(1, parseInt(rowsInput || "4", 10) || 4);
-    const cols = Math.max(1, parseInt(colsInput || "5", 10) || 5);
+
+    const name = (panelForm.name || "").trim();
+    if (!name) {
+      showError("Panel name is required");
+      return;
+    }
+
+    const rows = Number.parseInt(panelForm.rows, 10);
+    const cols = Number.parseInt(panelForm.cols, 10);
+
+    const gridRows = Number.isInteger(rows) && rows > 0 ? rows : 4;
+    const gridCols = Number.isInteger(cols) && cols > 0 ? cols : 5;
+
     try {
       const created = await fetchJson("/api/menu-layout/categories/" + selectedCategoryId + "/panels", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), gridRows: rows, gridCols: cols })
+        body: JSON.stringify({ name, gridRows, gridCols })
       });
+      closePanelForm();
       await loadPanels(selectedCategoryId, created.id);
       showSuccess("Panel created");
     } catch (err) {
@@ -688,26 +798,39 @@ function BackOfficeMenu() {
   }
   function openModifierManager(item) {
     setModifierContext(item);
+    setModifierContextGroups([]);
+    refreshModifierContextGroups(item.id);
   }
 
   function closeModifierManager() {
     setModifierContext(null);
+    setModifierContextGroups([]);
+    setModifierEditorLoading(false);
   }
 
   async function handleCreateModifierGroup(item, formValues) {
     try {
-      await fetchJson("/api/modifiers", {
+      const payload = {
+        name: formValues.name.trim(),
+        menu_id: item.id,
+        is_required: formValues.isRequired,
+        is_multiple: formValues.isMultiple,
+        selection_mode: formValues.selectionMode,
+        sort_order: Number(formValues.sortOrder || 0)
+      };
+      const created = await fetchJson("/api/modifiers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: formValues.name.trim(),
-          menu_id: item.id,
-          is_required: formValues.isRequired,
-          is_multiple: formValues.isMultiple,
-          selection_mode: formValues.selectionMode
-        })
+        body: JSON.stringify(payload)
       });
-      await loadModifiers();
+      const normalized = normalizeModifierGroup({ ...created, options: [] });
+      setModifierContextGroups((prev) => {
+        const next = [...prev, normalized];
+        return next.sort((a, b) => {
+          if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+          return a.name.localeCompare(b.name);
+        });
+      });
       showSuccess("Modifier group added");
     } catch (err) {
       console.error(err);
@@ -717,16 +840,28 @@ function BackOfficeMenu() {
 
   async function handleUpdateModifierGroup(groupId, formValues) {
     try {
+      const payload = {
+        name: formValues.name.trim(),
+        is_required: formValues.isRequired,
+        is_multiple: formValues.isMultiple,
+        selection_mode: formValues.selectionMode,
+        sort_order: Number(formValues.sortOrder || 0)
+      };
       await fetchJson("/api/modifiers/" + groupId, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: formValues.name.trim(),
-          is_required: formValues.isRequired,
-          is_multiple: formValues.isMultiple
-        })
+        body: JSON.stringify(payload)
       });
-      await loadModifiers();
+      setModifierContextGroups((prev) => prev.map((group) => {
+        if (group.id !== groupId) return group;
+        return normalizeModifierGroup({
+          ...group,
+          ...payload,
+          id: groupId,
+          menuId: group.menuId,
+          options: group.options
+        });
+      }));
       showSuccess("Modifier group updated");
     } catch (err) {
       console.error(err);
@@ -738,7 +873,7 @@ function BackOfficeMenu() {
     if (!window.confirm("Delete modifier group?")) return;
     try {
       await fetchJson("/api/modifiers/" + groupId, { method: "DELETE" });
-      await loadModifiers();
+      setModifierContextGroups((prev) => prev.filter((group) => group.id !== groupId));
       showSuccess("Modifier group deleted");
     } catch (err) {
       console.error(err);
@@ -748,16 +883,27 @@ function BackOfficeMenu() {
 
   async function handleCreateModifierOption(groupId, formValues) {
     try {
-      await fetchJson("/api/modifiers/options", {
+      const payload = {
+        modifier_id: groupId,
+        label: formValues.label.trim(),
+        price_delta: Number(formValues.priceDelta || 0),
+        sort_order: Number(formValues.sortOrder || 0),
+        is_default: formValues.isDefault === true
+      };
+      const created = await fetchJson("/api/modifiers/options", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          modifier_id: groupId,
-          label: formValues.label.trim(),
-          price_delta: Number(formValues.priceDelta || 0)
-        })
+        body: JSON.stringify(payload)
       });
-      await loadModifiers();
+      const normalized = normalizeModifierOption(created);
+      setModifierContextGroups((prev) => prev.map((group) => {
+        if (group.id !== groupId) return group;
+        const options = [...group.options, normalized].sort((a, b) => {
+          if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+          return a.label.localeCompare(b.label);
+        });
+        return { ...group, options };
+      }));
       showSuccess("Option added");
     } catch (err) {
       console.error(err);
@@ -767,15 +913,27 @@ function BackOfficeMenu() {
 
   async function handleUpdateModifierOption(optionId, formValues) {
     try {
+      const payload = {
+        label: formValues.label.trim(),
+        price_delta: Number(formValues.priceDelta || 0),
+        sort_order: Number(formValues.sortOrder || 0),
+        is_default: formValues.isDefault === true
+      };
       await fetchJson("/api/modifiers/options/" + optionId, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          label: formValues.label.trim(),
-          price_delta: Number(formValues.priceDelta || 0)
-        })
+        body: JSON.stringify(payload)
       });
-      await loadModifiers();
+      setModifierContextGroups((prev) => prev.map((group) => {
+        const options = group.options.map((opt) => {
+          if (opt.id !== optionId) return opt;
+          return normalizeModifierOption({ ...opt, ...payload, id: optionId });
+        }).sort((a, b) => {
+          if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+          return a.label.localeCompare(b.label);
+        });
+        return { ...group, options };
+      }));
       showSuccess("Option updated");
     } catch (err) {
       console.error(err);
@@ -787,23 +945,45 @@ function BackOfficeMenu() {
     if (!window.confirm("Delete option?")) return;
     try {
       await fetchJson("/api/modifiers/options/" + optionId, { method: "DELETE" });
-      await loadModifiers();
+      setModifierContextGroups((prev) => prev.map((group) => ({
+        ...group,
+        options: group.options.filter((opt) => opt.id !== optionId)
+      })));
       showSuccess("Option deleted");
     } catch (err) {
       console.error(err);
       showError(err.message || "Failed to delete option");
     }
   }
+
+  async function handleCopyModifierGroup(sourceGroupId, overrideName) {
+    if (!modifierContext) return;
+    try {
+      const copied = await fetchJson(`/api/modifiers/${sourceGroupId}/copy`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          menuId: modifierContext.id,
+          name: overrideName && overrideName.trim() ? overrideName.trim() : undefined
+        })
+        
+      });
+      const normalized = normalizeModifierGroup(copied);
+      setModifierContextGroups((prev) => {
+        const next = [...prev, normalized];
+        return next.sort((a, b) => {
+          if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+          return a.name.localeCompare(b.name);
+        });
+      });
+      showSuccess("Modifier group copied");
+    } catch (err) {
+      console.error(err);
+      showError(err.message || "Failed to copy modifier group");
+    }
+  }
   const slotsAssignedCount = Object.keys(draftSlots).length;
 
-  const modifierGroupsForContext = useMemo(() => {
-    if (!modifierContext) return [];
-    return modifiers.filter((mod) => mod.menu_id === modifierContext.id || mod.menuId === modifierContext.id);
-  }, [modifiers, modifierContext]);
-
-  function optionsForGroup(groupId) {
-    return modifierOptions[groupId] || [];
-  }
   if (loading) {
     return (
       <div style={layoutStyles.page}>
@@ -845,10 +1025,59 @@ function BackOfficeMenu() {
           <div style={layoutStyles.card}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <h3 style={{ margin: 0 }}>Categories</h3>
-              <button type="button" style={layoutStyles.primaryButton} onClick={handleCreateCategory}>
-                Add
+              <button
+                type="button"
+                style={categoryFormVisible ? layoutStyles.secondaryButton : layoutStyles.primaryButton}
+                onClick={categoryFormVisible ? closeCategoryForm : openCategoryForm}
+              >
+                {categoryFormVisible ? "Cancel" : "Add"}
               </button>
             </div>
+            {categoryFormVisible && (
+              <form
+                onSubmit={handleCreateCategorySubmit}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 10,
+                  padding: "12px",
+                  border: "1px solid #d1d5db",
+                  borderRadius: 10,
+                  backgroundColor: "#f8fafc",
+                  marginTop: 12
+                }}
+              >
+                <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <span>Name</span>
+                  <input
+                    style={layoutStyles.input}
+                    value={categoryForm.name}
+                    onChange={(e) => setCategoryForm((prev) => ({ ...prev, name: e.target.value }))}
+                    placeholder="e.g. Pizzas"
+                  />
+                </label>
+                <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <span>Position</span>
+                  <select
+                    style={layoutStyles.input}
+                    value={categoryForm.position}
+                    onChange={(e) => setCategoryForm((prev) => ({ ...prev, position: e.target.value }))}
+                  >
+                    <option value="left">Left (default)</option>
+                    <option value="right">Right</option>
+                    <option value="top">Top</option>
+                  </select>
+                </label>
+                <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                  <button type="button" style={layoutStyles.secondaryButton} onClick={closeCategoryForm}>
+                    Cancel
+                  </button>
+                  <button type="submit" style={layoutStyles.primaryButton}>
+                    Save Category
+                  </button>
+                </div>
+              </form>
+            )}
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {categories.length === 0 && <div style={{ color: "#6b7280", fontSize: 13 }}>No categories yet.</div>}
               {categories.map((category) => (
@@ -901,10 +1130,69 @@ function BackOfficeMenu() {
           <div style={layoutStyles.card}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <h3 style={{ margin: 0 }}>Panels</h3>
-              <button type="button" style={layoutStyles.primaryButton} onClick={handleCreatePanel}>
-                Add Panel
+              <button
+                type="button"
+                style={panelFormVisible ? layoutStyles.secondaryButton : layoutStyles.primaryButton}
+                onClick={panelFormVisible ? closePanelForm : openPanelForm}
+              >
+                {panelFormVisible ? "Cancel" : "Add Panel"}
               </button>
             </div>
+            {panelFormVisible && (
+              <form
+                onSubmit={handleCreatePanelSubmit}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 10,
+                  padding: "12px",
+                  border: "1px solid #d1d5db",
+                  borderRadius: 10,
+                  backgroundColor: "#f8fafc",
+                  marginTop: 12
+                }}
+              >
+                <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <span>Name</span>
+                  <input
+                    style={layoutStyles.input}
+                    value={panelForm.name}
+                    onChange={(e) => setPanelForm((prev) => ({ ...prev, name: e.target.value }))}
+                    placeholder="e.g. Lunch Specials"
+                  />
+                </label>
+                <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
+                  <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    <span>Rows</span>
+                    <input
+                      style={layoutStyles.input}
+                      type="number"
+                      min="1"
+                      value={panelForm.rows}
+                      onChange={(e) => setPanelForm((prev) => ({ ...prev, rows: e.target.value }))}
+                    />
+                  </label>
+                  <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    <span>Columns</span>
+                    <input
+                      style={layoutStyles.input}
+                      type="number"
+                      min="1"
+                      value={panelForm.cols}
+                      onChange={(e) => setPanelForm((prev) => ({ ...prev, cols: e.target.value }))}
+                    />
+                  </label>
+                </div>
+                <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                  <button type="button" style={layoutStyles.secondaryButton} onClick={closePanelForm}>
+                    Cancel
+                  </button>
+                  <button type="submit" style={layoutStyles.primaryButton}>
+                    Save Panel
+                  </button>
+                </div>
+              </form>
+            )}
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
               {panels.length === 0 && <div style={{ color: "#6b7280" }}>No panels yet.</div>}
               {panels.map((panel) => (
@@ -1158,14 +1446,17 @@ function BackOfficeMenu() {
       {modifierContext && (
         <ModifierManagerModal
           item={modifierContext}
-          groups={modifierGroupsForContext}
-          optionsForGroup={optionsForGroup}
+          groups={modifierContextGroups}
+          items={items}
+          isLoading={modifierEditorLoading}
           onCreateGroup={handleCreateModifierGroup}
           onUpdateGroup={handleUpdateModifierGroup}
           onDeleteGroup={handleDeleteModifierGroup}
           onCreateOption={handleCreateModifierOption}
           onUpdateOption={handleUpdateModifierOption}
           onDeleteOption={handleDeleteModifierOption}
+          onCopyGroup={handleCopyModifierGroup}
+          loadGroupsForMenu={fetchGroupsForMenu}
           onClose={closeModifierManager}
         />
       )}
@@ -1265,12 +1556,45 @@ function ItemEditorModal({ categories, draft, onSubmit, onClose }) {
           </label>
           <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <span>Button color</span>
-            <input
-              style={layoutStyles.input}
-              value={form.buttonColor}
-              onChange={(e) => setForm((prev) => ({ ...prev, buttonColor: e.target.value }))}
-              placeholder="#2563eb"
-            />
+            <div style={{ position: "relative" }}>
+              <input
+                type="color"
+                value={form.buttonColor || "#2563eb"}
+                onChange={(e) => setForm((prev) => ({ ...prev, buttonColor: e.target.value }))}
+                style={{
+                  position: "absolute",
+                  opacity: 0,
+                  width: "100%",
+                  height: "100%",
+                  cursor: "pointer"
+                }}
+              />
+              <div style={{
+                ...layoutStyles.input,
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                cursor: "pointer",
+                border: "2px solid #e5e7eb",
+                borderRadius: "8px",
+                padding: "8px 12px"
+              }}>
+                <div style={{
+                  width: "24px",
+                  height: "24px",
+                  borderRadius: "50%",
+                  background: form.buttonColor || "#2563eb",
+                  border: "2px solid white",
+                  boxShadow: "0 0 0 1px rgba(0,0,0,0.1)"
+                }} />
+                <span style={{ flex: 1, color: "#374151" }}>
+                  {form.buttonColor || "#2563eb"}
+                </span>
+                <span style={{ color: "#9ca3af", fontSize: "14px" }}>
+                  Click to change
+                </span>
+              </div>
+            </div>
           </label>
           <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <span>Sort order</span>
@@ -1300,220 +1624,6 @@ function ItemEditorModal({ categories, draft, onSubmit, onClose }) {
     </div>
   );
 }
-function ModifierManagerModal({
-  item,
-  groups,
-  optionsForGroup,
-  onCreateGroup,
-  onUpdateGroup,
-  onDeleteGroup,
-  onCreateOption,
-  onUpdateOption,
-  onDeleteOption,
-  onClose
-}) {
-  const [groupDraft, setGroupDraft] = useState({
-    name: "",
-    selectionMode: "whole",
-    isRequired: false,
-    isMultiple: false
-  });
-  const [optionDraft, setOptionDraft] = useState({ groupId: "", label: "", priceDelta: "0" });
 
-  return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        backgroundColor: "rgba(15, 23, 42, 0.45)",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        padding: 20,
-        zIndex: 1200
-      }}
-    >
-      <div
-        style={{
-          backgroundColor: "#fff",
-          borderRadius: 12,
-          padding: 24,
-          boxShadow: "0 20px 50px rgba(15, 23, 42, 0.25)",
-          width: 640,
-          maxWidth: "100%",
-          maxHeight: "90vh",
-          overflowY: "auto"
-        }}
-      >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <h2 style={{ margin: 0 }}>Modifiers / {item.name}</h2>
-          <button type="button" onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#6b7280" }}>
-            x
-          </button>
-        </div>
-
-        <section style={{ marginBottom: 18 }}>
-          <h3 style={{ margin: "0 0 10px 0" }}>Add Group</h3>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (!groupDraft.name.trim()) {
-                onClose();
-                return;
-              }
-              onCreateGroup(item, groupDraft);
-              setGroupDraft({ name: "", selectionMode: "whole", isRequired: false, isMultiple: false });
-            }}
-            style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}
-          >
-            <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <span>Name</span>
-              <input
-                style={layoutStyles.input}
-                value={groupDraft.name}
-                onChange={(e) => setGroupDraft((prev) => ({ ...prev, name: e.target.value }))}
-                required
-              />
-            </label>
-            <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <span>Selection mode</span>
-              <select
-                style={layoutStyles.input}
-                value={groupDraft.selectionMode}
-                onChange={(e) => setGroupDraft((prev) => ({ ...prev, selectionMode: e.target.value }))}
-              >
-                <option value="whole">Whole item</option>
-                <option value="half">Half only</option>
-                <option value="half_and_half">Half & Whole</option>
-              </select>
-            </label>
-            <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <input
-                type="checkbox"
-                checked={groupDraft.isRequired}
-                onChange={(e) => setGroupDraft((prev) => ({ ...prev, isRequired: e.target.checked }))}
-              />
-              <span>Required</span>
-            </label>
-            <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <input
-                type="checkbox"
-                checked={groupDraft.isMultiple}
-                onChange={(e) => setGroupDraft((prev) => ({ ...prev, isMultiple: e.target.checked }))}
-              />
-              <span>Allow multiple selections</span>
-            </label>
-            <div style={{ gridColumn: "1 / span 2", display: "flex", gap: 10 }}>
-              <button type="submit" style={layoutStyles.primaryButton}>Add Group</button>
-              <button type="button" style={layoutStyles.secondaryButton} onClick={() => setGroupDraft({ name: "", selectionMode: "whole", isRequired: false, isMultiple: false })}>
-                Clear
-              </button>
-            </div>
-          </form>
-        </section>
-
-        <section style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          {groups.length === 0 && <div style={{ color: "#6b7280" }}>No modifier groups yet.</div>}
-          {groups.map((group) => (
-            <div key={group.id} style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: "12px 14px", display: "flex", flexDirection: "column", gap: 12 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div>
-                  <div style={{ fontWeight: 600 }}>{group.name}</div>
-                  <div style={{ fontSize: 12, color: "#6b7280" }}>
-                    {(group.is_required ? "Required" : "Optional") + " / " + (group.is_multiple ? "Multi-select" : "Single") + " / " + (group.selection_mode || "whole")}
-                  </div>
-                </div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button
-                    type="button"
-                    style={{ ...layoutStyles.secondaryButton, padding: "6px 10px" }}
-                    onClick={() => {
-                      const nextName = window.prompt("Rename group", group.name);
-                      if (!nextName || !nextName.trim()) return;
-                      const makeRequired = window.confirm("Should this group be required?");
-                      const allowMultiple = window.confirm("Allow multiple selections?");
-                      onUpdateGroup(group.id, {
-                        name: nextName,
-                        isRequired: makeRequired,
-                        isMultiple: allowMultiple
-                      });
-                    }}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    style={{ ...layoutStyles.secondaryButton, padding: "6px 10px" }}
-                    onClick={() => onDeleteGroup(group.id)}
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {optionsForGroup(group.id).map((option) => (
-                  <div key={option.id} style={{ border: "1px solid #d1d5db", borderRadius: 8, padding: "8px 10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div>
-                      <div style={{ fontWeight: 600 }}>{option.label}</div>
-                      <div style={{ fontSize: 12, color: "#6b7280" }}>+ $ {Number(option.price_delta || 0).toFixed(2)}</div>
-                    </div>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <button
-                        type="button"
-                        style={{ ...layoutStyles.secondaryButton, padding: "6px 10px" }}
-                        onClick={() => {
-                          const nextLabel = window.prompt("Rename option", option.label);
-                          if (!nextLabel || !nextLabel.trim()) return;
-                          const nextPrice = window.prompt("Price delta", String(option.price_delta || 0)) || "0";
-                          onUpdateOption(option.id, { label: nextLabel, priceDelta: Number(nextPrice) || 0 });
-                        }}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        style={{ ...layoutStyles.secondaryButton, padding: "6px 10px" }}
-                        onClick={() => onDeleteOption(option.id)}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                ))}
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    if (!optionDraft.label.trim()) return;
-                    onCreateOption(group.id, optionDraft);
-                    setOptionDraft({ groupId: "", label: "", priceDelta: "0" });
-                  }}
-                  style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}
-                >
-                  <input
-                    style={{ ...layoutStyles.input, flex: 1, minWidth: 140 }}
-                    placeholder="Option name"
-                    value={optionDraft.groupId === group.id ? optionDraft.label : ""}
-                    onChange={(e) => setOptionDraft({ groupId: group.id, label: e.target.value, priceDelta: optionDraft.priceDelta })}
-                  />
-                  <input
-                    style={{ ...layoutStyles.input, width: 100 }}
-                    type="number"
-                    step="0.01"
-                    placeholder="Price"
-                    value={optionDraft.groupId === group.id ? optionDraft.priceDelta : "0"}
-                    onChange={(e) => setOptionDraft({ groupId: group.id, label: optionDraft.label, priceDelta: e.target.value })}
-                  />
-                  <button type="submit" style={{ ...layoutStyles.primaryButton, padding: "10px 14px" }}>
-                    Add Option
-                  </button>
-                </form>
-              </div>
-            </div>
-          ))}
-        </section>
-      </div>
-    </div>
-  );
-}
 
 export default BackOfficeMenu;

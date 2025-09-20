@@ -5,6 +5,7 @@ const modifierController = require("../controllers/modifierController");
 // CRUD for modifiers
 router.get("/", modifierController.getAllModifiers);
 router.post("/", modifierController.createModifier);
+router.post("/:id/copy", modifierController.copyModifierGroup);
 router.put("/:id", modifierController.updateModifier);
 router.delete("/:id", modifierController.deleteModifier);
 router.get("/by-menu/:menu_id", modifierController.getModifiersByMenuId);

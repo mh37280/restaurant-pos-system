@@ -3,6 +3,16 @@ import React, { forwardRef } from "react";
 const ReceiptPrintView = forwardRef(({ order }, ref) => {
     const items = JSON.parse(order.items || "[]");
 
+    const formatModifierOption = (option) => {
+        if (!option) return "";
+        const label = option.label || "";
+        const portion = option.portion && option.portion !== "whole"
+            ? (option.portion === "left" ? "Left Half" : option.portion === "right" ? "Right Half" : option.portion)
+            : "";
+        const priceText = option.price_delta ? ` (+$${Number(option.price_delta).toFixed(2)})` : "";
+        return portion ? `${portion}: ${label}${priceText}` : `${label}${priceText}`;
+    };
+
     // Helper function to pad text for alignment
     const padLine = (left, right, totalWidth = 32) => {
         const leftStr = String(left);
@@ -94,34 +104,34 @@ const ReceiptPrintView = forwardRef(({ order }, ref) => {
 
             {/* Items */}
             <div>
-                {items.map((item, i) => (
-                    <div key={i} style={{ marginBottom: "4px" }}>
-                        {/* Item line with quantity if > 1 */}
-                        <div style={thermalStyles.line}>
-                            {item.quantity && item.quantity > 1 ?
-                                padLine(`${item.quantity}x ${item.name}`, `$${(item.price * item.quantity).toFixed(2)}`) :
-                                padLine(item.name, `$${item.price.toFixed(2)}`)
-                            }
+                {items.map((item, i) => {
+                    const quantity = item.quantity && item.quantity > 0 ? item.quantity : 1;
+                    const unitPrice = item.unit_price != null ? Number(item.unit_price) : Number(item.price || 0);
+                    const lineTotal = unitPrice * quantity;
+
+                    return (
+                        <div key={i} style={{ marginBottom: "4px" }}>
+                            <div style={thermalStyles.line}>
+                                {quantity > 1 ?
+                                    padLine(`${quantity}x ${item.name}`, `$${lineTotal.toFixed(2)}`) :
+                                    padLine(item.name, `$${lineTotal.toFixed(2)}`)
+                                }
+                            </div>
+
+                            {quantity > 1 && (
+                                <div style={{ ...thermalStyles.line, marginLeft: "10px", fontSize: "11px", color: "#666" }}>
+                                    @ ${unitPrice.toFixed(2)} each
+                                </div>
+                            )}
+
+                            {item.modifiers?.map((mod, j) => (
+                                <div key={j} style={{ ...thermalStyles.line, marginLeft: "10px", fontSize: "11px" }}>
+                                    - {mod.name}: {mod.options.map(formatModifierOption).join(", ")}
+                                </div>
+                            ))}
                         </div>
-
-                        {/* Show individual price if quantity > 1 */}
-                        {item.quantity && item.quantity > 1 && (
-                            <div style={{ ...thermalStyles.line, marginLeft: "10px", fontSize: "11px", color: "#666" }}>
-                                @ ${item.price.toFixed(2)} each
-                            </div>
-                        )}
-
-                        {/* Modifiers */}
-                        {item.modifiers?.map((mod, j) => (
-                            <div key={j} style={{ ...thermalStyles.line, marginLeft: "10px", fontSize: "11px" }}>
-                                - {mod.name}: {mod.options.map((opt) => {
-                                    const price = opt.price_delta || 0;
-                                    return `${opt.label}${price > 0 ? ` (+$${price.toFixed(2)})` : ""}`;
-                                }).join(", ")}
-                            </div>
-                        ))}
-                    </div>
-                ))}
+                    );
+                })}
             </div>
 
             <div style={thermalStyles.separator}></div>

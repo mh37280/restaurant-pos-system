@@ -156,10 +156,7 @@ db.serialize(() => {
     '  is_required INTEGER DEFAULT 0,',
     '  is_multiple INTEGER DEFAULT 0,',
     "  selection_mode TEXT DEFAULT 'whole',",
-    '  min_select INTEGER DEFAULT 0,',
-    '  max_select INTEGER,',
     '  sort_order INTEGER DEFAULT 0,',
-    "  applies_to TEXT DEFAULT 'item',",
     '  FOREIGN KEY (menu_id) REFERENCES menu(id)',
     ');'
   ].join('\n'));
@@ -187,10 +184,7 @@ db.serialize(() => {
   ensureColumn('menu', 'is_visible INTEGER DEFAULT 1');
 
   ensureColumn('modifiers', "selection_mode TEXT DEFAULT 'whole'");
-  ensureColumn('modifiers', 'min_select INTEGER DEFAULT 0');
-  ensureColumn('modifiers', 'max_select INTEGER');
   ensureColumn('modifiers', 'sort_order INTEGER DEFAULT 0');
-  ensureColumn('modifiers', "applies_to TEXT DEFAULT 'item'");
 
   ensureColumn('modifier_options', 'sort_order INTEGER DEFAULT 0');
   ensureColumn('modifier_options', 'is_default INTEGER DEFAULT 0');
@@ -217,7 +211,14 @@ db.serialize(() => {
   ].join('\n'));
 });
 
-db.runAsync = promisify(db.run).bind(db);
+db.runAsync = (sql, params = []) =>
+  new Promise((resolve, reject) => {
+    db.run(sql, params, function (err) {
+      if (err) return reject(err);
+      resolve({ lastID: this?.lastID ?? null, changes: this?.changes ?? 0 });
+    });
+  });
+
 db.getAsync = promisify(db.get).bind(db);
 db.allAsync = promisify(db.all).bind(db);
 

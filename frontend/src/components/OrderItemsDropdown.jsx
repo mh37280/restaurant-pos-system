@@ -4,6 +4,16 @@ function OrderItemsDropdown({ order }) {
     const [open, setOpen] = useState(false);
     const items = JSON.parse(order.items || "[]");
 
+    const formatModifierOption = (option) => {
+        if (!option) return "";
+        const label = option.label || "";
+        const portion = option.portion && option.portion !== "whole"
+            ? option.portion === "left" ? "Left Half" : option.portion === "right" ? "Right Half" : option.portion
+            : "";
+        const priceText = option.price_delta ? ` (+$${Number(option.price_delta).toFixed(2)})` : "";
+        return portion ? `${portion}: ${label}${priceText}` : `${label}${priceText}`;
+    };
+
     return (
         <div
             style={{ position: "relative", display: "inline-block" }}
@@ -52,9 +62,32 @@ function OrderItemsDropdown({ order }) {
                     <hr style={{ margin: "10px 0" }} />
                     <h4 style={{ marginBottom: 6 }}>Items</h4>
                     <ul style={{ paddingLeft: "20px", marginBottom: 10 }}>
-                        {items.map((item, i) => (
-                            <li key={i}>{item.name} – ${item.price.toFixed(2)}</li>
-                        ))}
+                        {items.map((item, i) => {
+                            const quantity = item.quantity && item.quantity > 0 ? item.quantity : 1;
+                            const unitPrice = item.unit_price != null ? Number(item.unit_price) : Number(item.price || 0);
+                            const lineTotal = unitPrice * quantity;
+                            return (
+                                <li key={i} style={{ marginBottom: "6px" }}>
+                                    <div>
+                                        {quantity > 1 ? `${quantity}x ` : ""}{item.name} – ${lineTotal.toFixed(2)}
+                                        {quantity > 1 && (
+                                            <span style={{ fontSize: "12px", color: "#6b7280", marginLeft: "4px" }}>
+                                                @ ${unitPrice.toFixed(2)}
+                                            </span>
+                                        )}
+                                    </div>
+                                    {item.modifiers?.length > 0 && (
+                                        <ul style={{ paddingLeft: "16px", fontSize: "12px", color: "#555" }}>
+                                            {item.modifiers.map((mod, j) => (
+                                                <li key={j}>
+                                                    <strong>{mod.name}:</strong> {mod.options.map(formatModifierOption).join(", ")}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </li>
+                            );
+                        })}
                     </ul>
 
                     <p><strong>Total:</strong> ${parseFloat(order.total).toFixed(2)}</p>

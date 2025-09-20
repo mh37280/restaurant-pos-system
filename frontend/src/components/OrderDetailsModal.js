@@ -5,6 +5,16 @@ function OrderDetailsModal({ order, onClose }) {
 
   const items = JSON.parse(order.items || "[]");
 
+  const formatModifierOption = (option) => {
+    if (!option) return "";
+    const label = option.label || "";
+    const portion = option.portion && option.portion !== "whole"
+      ? `${option.portion === "left" ? "Left Half" : option.portion === "right" ? "Right Half" : option.portion}`
+      : "";
+    const priceText = option.price_delta ? ` (+$${Number(option.price_delta).toFixed(2)})` : "";
+    return portion ? `${portion}: ${label}${priceText}` : `${label}${priceText}`;
+  };
+
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (modalRef.current && !modalRef.current.contains(e.target)) {
@@ -59,33 +69,37 @@ function OrderDetailsModal({ order, onClose }) {
         <hr />
         <h3 style={{ marginTop: 10 }}>Items</h3>
         <ul style={{ paddingLeft: "20px", marginBottom: 10 }}>
-          {items.map((item, i) => (
-            <li key={i} style={{ marginBottom: "6px" }}>
-              <div>
-                <strong>
-                  {item.quantity && item.quantity > 1 ? `${item.quantity}x ` : ""}
-                  {item.name}
-                </strong> – $
-                {(item.quantity && item.quantity > 1
-                  ? item.price * item.quantity
-                  : item.price
-                ).toFixed(2)}
-              </div>
+          {items.map((item, i) => {
+            const quantity = item.quantity && item.quantity > 0 ? item.quantity : 1;
+            const unitPrice = item.unit_price != null ? Number(item.unit_price) : Number(item.price || 0);
+            const lineTotal = unitPrice * quantity;
+
+            return (
+              <li key={i} style={{ marginBottom: "6px" }}>
+                <div>
+                  <strong>
+                    {quantity > 1 ? `${quantity}x ` : ""}
+                    {item.name}
+                  </strong>{" "}– ${lineTotal.toFixed(2)}
+                  {quantity > 1 && (
+                    <span style={{ fontSize: "0.85em", color: "#6b7280", marginLeft: "6px" }}>
+                      @ ${unitPrice.toFixed(2)} each
+                    </span>
+                  )}
+                </div>
               {item.modifiers?.length > 0 && (
                 <ul style={{ paddingLeft: "15px", fontSize: "0.9em", color: "#555" }}>
                   {item.modifiers.map((mod, j) => (
                     <li key={j}>
                       <strong>{mod.name}:</strong>{" "}
-                      {mod.options.map((opt) => {
-                        const price = opt.price_delta || 0;
-                        return `${opt.label}${price > 0 ? ` (+${price.toFixed(2)})` : ""}`;
-                      }).join(", ")}
+                      {mod.options.map(formatModifierOption).join(", ")}
                     </li>
                   ))}
                 </ul>
               )}
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
 
         <p><strong>Total:</strong> ${parseFloat(order.total).toFixed(2)}</p>
