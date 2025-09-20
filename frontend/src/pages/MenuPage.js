@@ -153,12 +153,12 @@ function MenuPage() {
   const [selectedPanelId, setSelectedPanelId] = useState(null);
   const [panelSlots, setPanelSlots] = useState([]);
 
-  const { customerName, phoneNumber, address, orderType } = state || {};
+  const { customerName, phoneNumber, address, orderType, order: editingOrder } = state || {};
+  const isEditMode = !!editingOrder;
   const customer_name = customerName;
   const phone_number = phoneNumber;
 
-  const [ticketNumber, setTicketNumber] = useState(null);
-
+  const [ticketNumber, setTicketNumber] = useState(isEditMode ? editingOrder?.ticket_number : null);
   const modifierCacheRef = useRef(new Map());
 
   // Quick cash amounts for easy selection
@@ -235,7 +235,22 @@ function MenuPage() {
         console.error("Failed to fetch ticket number:", err);
       });
   }, []);
-
+  useEffect(() => {
+    if (isEditMode && editingOrder) {
+      try {
+        const existingItems = JSON.parse(editingOrder.items || "[]");
+        const normalizedItems = existingItems.map((item, index) => ({
+          ...item,
+          id: Date.now() + index, // Generate new IDs for React keys
+          quantity: item.quantity || 1,
+          modifiers: item.modifiers || []
+        }));
+        setSelectedItems(normalizedItems);
+      } catch (error) {
+        console.error("Failed to parse existing order items:", error);
+      }
+    }
+  }, [isEditMode, editingOrder]);
   useEffect(() => {
     if (receiptListRef.current) {
       receiptListRef.current.scrollTop = receiptListRef.current.scrollHeight;
@@ -480,7 +495,7 @@ function MenuPage() {
     setModifierError("");
   };
 
- 
+
   const buildSelectedModifiers = () => {
     return modifierGroups
       .map((group) => {
@@ -674,7 +689,7 @@ function MenuPage() {
                 }, 0);
 
                 const requirementText = (() => {
-                 
+
                   const parts = [];
 
                   if (parts.length === 0) return null;
@@ -883,10 +898,10 @@ function MenuPage() {
         menu_item_id: menuItemId ?? null
       })),
       total: parseFloat(calculateTotal().toFixed(2)),
-      order_type: orderType,
-      customer_name,
-      phone_number,
-      address,
+      order_type: orderType || editingOrder?.order_type,
+      customer_name: customerName || editingOrder?.customer_name,
+      phone_number: phoneNumber || editingOrder?.phone_number,
+      address: address || editingOrder?.address,
       payment_method: paymentMethod,
       driver_id: null,
       status: "pending",
@@ -894,10 +909,12 @@ function MenuPage() {
       card_amount: isSplitPayment ? parseFloat(cardAmount || 0) : paymentMethod === "credit" ? parseFloat(calculateTotal().toFixed(2)) : null,
     };
 
-
     try {
-      const res = await fetch("/api/orders", {
-        method: "POST",
+      const url = isEditMode ? `/api/orders/${editingOrder.id}` : "/api/orders";
+      const method = isEditMode ? "PUT" : "POST";
+
+      const res = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(orderData),
       });
@@ -906,17 +923,17 @@ function MenuPage() {
         const apiResponse = await res.json();
         const completeOrder = {
           ...orderData,
-          id: apiResponse.id || apiResponse.orderId || apiResponse.order_id,
+          id: isEditMode ? editingOrder.id : (apiResponse.id || apiResponse.orderId || apiResponse.order_id),
           items: JSON.stringify(orderData.items),
         };
 
         navigate("/print-receipt", { state: { order: completeOrder } });
       } else {
-        setPaymentError("Failed to process payment.");
+        setPaymentError(`Failed to ${isEditMode ? 'update' : 'process'} payment.`);
       }
     } catch (error) {
-      console.error("Error processing payment:", error);
-      setPaymentError("Payment processing error.");
+      console.error(`Error ${isEditMode ? 'updating' : 'processing'} payment:`, error);
+      setPaymentError(`Payment ${isEditMode ? 'update' : 'processing'} error.`);
     }
   };
 
@@ -938,8 +955,9 @@ function MenuPage() {
 
 
   const cancelOrder = () => {
-    if (window.confirm("Cancel this order?")) {
-      navigate("/");
+    const confirmMessage = isEditMode ? "Cancel editing this order?" : "Cancel this order?";
+    if (window.confirm(confirmMessage)) {
+      navigate(isEditMode ? "/recall" : "/");
     }
   };
 
@@ -1236,7 +1254,9 @@ function MenuPage() {
       }}>
         <div style={{ padding: "20px", backgroundColor: "white", borderBottom: "2px solid #e9ecef" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-            <h3 style={{ margin: 0, color: "#495057" }}>Current Order</h3>
+            <h3 style={{ margin: 0, color: "#495057" }}>
+              {isEditMode ? `Edit Order #${editingOrder?.id}` : "Current Order"}
+            </h3>
             {ticketNumber && (
               <div style={{
                 padding: "8px 16px",
@@ -1455,8 +1475,7 @@ function MenuPage() {
               fontSize: "16px"
             }}
           >
-            💳 Process Payment - ${calculateTotal().toFixed(2)}
-          </button>
+            {isEditMode ? "💾 Update Order" : "💳 Process Payment"} - ${calculateTotal().toFixed(2)}          </button>
         </div>
       </div>
 

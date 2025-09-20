@@ -10,7 +10,6 @@ import DeliveryStatus from './pages/DeliveryStatus';
 import VoidOrders from './pages/VoidOrders';
 import DailySettle from './pages/DailySettle';
 import RecallOrders from './pages/RecallOrders';
-import EditOrderPage from './pages/EditOrderPage';
 import PrintReceiptPage from './pages/PrintReceiptPage';
 import BackOfficeHome from './pages/BackOfficeHome';
 import BackOfficeMenu from './pages/BackOfficeMenu';
@@ -32,7 +31,7 @@ function AppRouter() {
         <Route path="/void" element={<VoidOrders />} />
         <Route path="/settle" element={<DailySettle />} />
         <Route path="/recall" element={<RecallOrders />} />
-        <Route path="/recall/edit-order" element={<EditOrderPage />} />
+        <Route path="/recall/edit-order" element={<MenuPage />} />
         <Route path="/print-receipt" element={<PrintReceiptPage />} />
         <Route path="/backoffice" element={<BackOfficeHome />} />
         <Route path="/backoffice/menu" element={<BackOfficeMenu />} />

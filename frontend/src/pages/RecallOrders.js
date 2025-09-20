@@ -201,7 +201,15 @@ function RecallOrders() {
                                                 View
                                             </button>
                                             <button
-                                                onClick={() => navigate("/recall/edit-order", { state: { order } })}
+                                                onClick={() => navigate("/recall/edit-order", {
+                                                    state: {
+                                                        order,
+                                                        customerName: order.customer_name,
+                                                        phoneNumber: order.phone_number,
+                                                        address: order.address,
+                                                        orderType: order.order_type
+                                                    }
+                                                })}
                                                 style={btn}
                                             >
                                                 Edit
